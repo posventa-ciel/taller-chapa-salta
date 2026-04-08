@@ -20,6 +20,10 @@ st.set_page_config(page_title="Gestión Taller CENOA - Salta", layout="wide", in
 # --- CONEXIÓN A GOOGLE SHEETS (GSPREAD) ---
 try:
     creds_dict = json.loads(st.secrets["google_credentials"])
+    
+    # --- LA LÍNEA MÁGICA QUE ARREGLA EL ERROR PEM ---
+    creds_dict["private_key"] = creds_dict["private_key"].replace("\\n", "\n")
+    
     gc = gspread.service_account_from_dict(creds_dict)
     planilla = gc.open_by_key(ID_PLANILLA)
     hoja = planilla.worksheet("TURNOS") # Asegurate de que exista una pestaña que se llame TURNOS
