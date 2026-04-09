@@ -1067,8 +1067,11 @@ with tab_portal:
 # ==========================================
 with tab_fac:
     if not df.empty:
-        st.subheader("💰 Análisis de Facturación y Objetivos")
+        # Título de Jujuy
+        st.markdown("## 💰 Análisis de Facturación y Objetivos")
+        st.markdown(f"<p style='color: gray; font-size: 1em;'>Período de Análisis: <strong>{mes_seleccionado_label}</strong> | Objetivo Mensual: <strong>{OBJETIVO_MENSUAL_PANOS} Paños</strong></p>", unsafe_allow_html=True)
         
+        # --- PREPARACIÓN DE DATOS (Salta) ---
         df_analisis = df.copy()
         def clasificar_estado(row):
             est_taller = str(row['Estado_Taller']).upper()
@@ -1080,221 +1083,259 @@ with tab_fac:
             
         df_analisis['Estado_Resumen'] = df_analisis.apply(clasificar_estado, axis=1)
 
+        # Filtramos para calcular métricas
         df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
         
-        # --- CALCULOS DE PLATAS Y PAÑOS ---
-        # FAC
-        mo_fac = df_fac['Precio'].sum()
-        rep_fac = df_fac['Costo'].sum()
-        total_fac = mo_fac + rep_fac
-        panos_fac = df_fac['Paños'].sum()
+        # Métricas FAC
+        fac_mo = df_fac['Precio'].sum()
+        fac_rep = df_fac['Costo'].sum()
+        fac_total = fac_mo + fac_rep
+        fac_panos = df_fac['Paños'].sum()
         
-        # SI
-        mo_si = df_si['Precio'].sum()
-        rep_si = df_si['Costo'].sum()
-        total_si = mo_si + rep_si
-        panos_si = df_si['Paños'].sum()
+        # Métricas SI
+        si_mo = df_si['Precio'].sum()
+        si_rep = df_si['Costo'].sum()
+        si_total = si_mo + si_rep
+        si_panos = df_si['Paños'].sum()
         
-        # PROYECTADO AL CIERRE (FAC + SI)
-        mo_est = mo_fac + mo_si
-        rep_est = rep_fac + rep_si
-        total_est = total_fac + total_si
-        panos_est = panos_fac + panos_si
+        # Métricas PROYECCIÓN (FAC + SI)
+        proy_mo = fac_mo + si_mo
+        proy_rep = fac_rep + si_rep
+        proy_total = fac_total + si_total
+        proy_panos = fac_panos + si_panos
         
-        porcentaje_logro = min((panos_est / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
+        # Objetivo y Ritmo
+        porcentaje_logro = min((proy_panos / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
         dias_restantes = dias_restantes_calc
-        panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est)
+        panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - proy_panos)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
+
+        # --- SECCIÓN 1: KEY METRICS (Mimic Jujuy - Salta Style sin fondo verde) ---
+        st.markdown("<br>", unsafe_allow_html=True)
+        c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
         
-        # --- 1. Control de Objetivo Mensual y Ritmo ---
-        st.markdown("### 1️⃣ Control de Objetivo Mensual y Ritmo (Mano de Obra)")
+        # Tarjeta FAC (Verde oscuro Salta)
+        c_kpi1.markdown(f'''
+        <div class="metric-card" style="border-left: 6px solid #1e7e34; background-color: white;">
+            <div class="metric-title" style="color: #1e7e34;">Facturado Actual (FAC)</div>
+            <div class="metric-value-money" style="color: #1e7e34; font-size: 2.2rem;">{formato_pesos(fac_total)}</div>
+            <div style="display: flex; justify-content: space-around; margin-top: 5px; color: #555; font-size: 0.9em;">
+                <div><span style="font-weight:600;">M.O.:</span> {formato_pesos(fac_mo)}</div>
+                <div><span style="font-weight:600;">Repuestos:</span> {formato_pesos(fac_rep)}</div>
+            </div>
+            <hr style="margin: 8px 0; border: 0.5px solid #d4edda;">
+            <div class="metric-subtitle-gray" style="font-size: 1.1em; color: #1e7e34; font-weight: bold; text-align: center;">
+                📦 {fac_panos:.1f} paños asegurados
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Tarjeta SI (Cian/Azul clarito Jujuy - Salta Style sin fondo verde)
+        c_kpi2.markdown(f'''
+        <div class="metric-card" style="border-left: 6px solid #17a2b8; background-color: white;">
+            <div class="metric-title" style="color: #17a2b8;">Aprobado (SI)</div>
+            <div class="metric-value-money" style="color: #17a2b8; font-size: 2.2rem;">{formato_pesos(si_total)}</div>
+            <div style="display: flex; justify-content: space-around; margin-top: 5px; color: #555; font-size: 0.9em;">
+                <div><span style="font-weight:600;">M.O.:</span> {formato_pesos(si_mo)}</div>
+                <div><span style="font-weight:600;">Repuestos:</span> {formato_pesos(si_rep)}</div>
+            </div>
+            <hr style="margin: 8px 0; border: 0.5px solid #d1ecf1;">
+            <div class="metric-subtitle-gray" style="font-size: 1.1em; color: #17a2b8; font-weight: bold; text-align: center;">
+                📦 {si_panos:.1f} paños asegurados
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+        
+        # Tarjeta PROYECCIÓN (Azul corporativo)
+        c_kpi3.markdown(f'''
+        <div class="metric-card" style="border-left: 6px solid #00235d; background-color: white;">
+            <div class="metric-title" style="color: #00235d;">Estimado a Cierre de Mes (FAC+SI)</div>
+            <div class="metric-value-money" style="color: #00235d; font-size: 2.2rem;">{formato_pesos(proy_total)}</div>
+            <div style="display: flex; justify-content: space-around; margin-top: 5px; color: #555; font-size: 0.9em;">
+                <div><span style="font-weight:600;">M.O.:</span> {formato_pesos(proy_mo)}</div>
+                <div><span style="font-weight:600;">Repuestos:</span> {formato_pesos(proy_rep)}</div>
+            </div>
+            <hr style="margin: 8px 0; border: 0.5px solid #dee2e6;">
+            <div class="metric-subtitle-gray" style="font-size: 1.1em; color: #00235d; font-weight: bold; text-align: center;">
+                📦 {proy_panos:.1f} paños totales proyectados
+            </div>
+        </div>
+        ''', unsafe_allow_html=True)
+
+        # --- OBJETIVO Y RITMO (Mimic Jujuy) ---
         c_obj1, c_obj2 = st.columns([3, 1])
         with c_obj1:
+            st.markdown(f"<p style='margin-bottom: 5px;'><strong>Progreso hacia el Objetivo:</strong> {proy_panos:.1f} de {OBJETIVO_MENSUAL_PANOS} Paños ({porcentaje_logro:.1f}%)</p>", unsafe_allow_html=True)
             st.progress(int(porcentaje_logro))
-            st.caption(f"**Progreso del Mes:** {panos_est:.1f} paños asegurados de un objetivo de {OBJETIVO_MENSUAL_PANOS} paños.")
         with c_obj2:
-            st.markdown(f"<h3 style='text-align: right; color: {'#28a745' if porcentaje_logro >= 95 else '#ffc107' if porcentaje_logro >= 75 else '#dc3545'}; margin-top: 0;'>{porcentaje_logro:.1f}%</h3>", unsafe_allow_html=True)
-            
-        st.info(f"⏱️ **Termómetro de Ritmo:** Faltan **{panos_faltantes:.1f} paños** y quedan **{dias_restantes} días hábiles**. Para llegar a la meta, el taller debe sacar a la calle **{ritmo_diario_necesario:.1f} paños por día**.")
-            
-        # --- 2. Rentabilidad Estimada al Cierre ---
-        st.write("### 2️⃣ Rentabilidad Estimada al Cierre")
-        c_r1, c_r2, c_r3 = st.columns(3)
+            color_meta = "#28a745" if porcentaje_logro >= 95 else "#ffc107" if porcentaje_logro >= 80 else "#dc3545"
+            st.markdown(f'''
+                <div style="background-color: {color_meta}; color: white; border-radius: 8px; padding: 10px; text-align: center; margin-top: 20px;">
+                    <div style="font-size: 0.8em; text-transform: uppercase;">Progreso Meta</div>
+                    <div style="font-size: 1.5rem; font-weight: bold;">{porcentaje_logro:.1f}%</div>
+                </div>
+            ''', unsafe_allow_html=True)
         
-        # Tarjeta FAC (Verde oscuro intenso)
-        c_r1.markdown(f'''
-        <div style="border: 2px solid #28a745; border-radius: 8px; padding: 15px; background-color: #f8fff9; text-align: center; height: 100%;">
-            <div style="color: #28a745; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Facturado Actual (FAC)</div>
-            <div style="color: #1e7e34; font-size: 2.2rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_fac)}</div>
-            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
-                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_fac)} <br>
-                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_fac)}
-            </div>
-            <hr style="margin: 10px 0; border-top: 1px solid #d4edda;">
-            <div style="color: #28a745; font-weight: bold; font-size: 1.1rem;">📦 {panos_fac:.1f} paños totales</div>
-        </div>
-        ''', unsafe_allow_html=True)
+        st.info(f"Faltan **{panos_faltantes:.1f} paños** para la meta. Ritmo diario necesario: **{ritmo_diario_necesario:.1f} paños/día**.")
         
-        # Tarjeta SI (Verde clarito prospecto)
-        c_r2.markdown(f'''
-        <div style="border: 2px solid #6cce75; border-radius: 8px; padding: 15px; background-color: #f0fdf2; text-align: center; height: 100%;">
-            <div style="color: #5cb85c; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Aprobado (SI)</div>
-            <div style="color: #5cb85c; font-size: 1.8rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_si)}</div>
-            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
-                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_si)} <br>
-                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_si)}
-            </div>
-            <hr style="margin: 10px 0; border-top: 1px solid #dff0d8;">
-            <div style="color: #5cb85c; font-weight: bold; font-size: 1.1rem;">📦 {panos_si:.1f} paños totales</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        # Tarjeta Total (Azul corporativo)
-        c_r3.markdown(f'''
-        <div style="border: 2px solid #00235d; border-radius: 8px; padding: 15px; background-color: #f8f9fa; text-align: center; height: 100%;">
-            <div style="color: #00235d; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Estimado al Cierre (FAC+SI)</div>
-            <div style="color: #00235d; font-size: 2.2rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_est)}</div>
-            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
-                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_est)} <br>
-                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_est)}
-            </div>
-            <hr style="margin: 10px 0; border-top: 1px solid #dee2e6;">
-            <div style="color: #00235d; font-weight: bold; font-size: 1.1rem;">📦 {panos_est:.1f} paños totales</div>
-        </div>
-        ''', unsafe_allow_html=True)
-        
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        with st.expander("🔍 Ver Detalle de Vehículos Aprobados (SI)"):
-            if not df_si.empty:
-                st.dataframe(df_si[['Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Precio', 'Costo', 'Paños', 'Estado_Taller']].sort_values('Precio', ascending=False), hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
-            else:
-                st.info("No hay vehículos en estado SI en este momento.")
+        st.divider()
 
-        # --- 3. Detalle de Estados Pendientes ---
-        df_tpf = df[df['Estado_Taller'].str.contains("TERM PEND FACT", na=False)]
-        df_tpe = df[df['Estado_Taller'].str.contains("TERM PEND ENTREG", na=False)]
-        df_epf = df[df['Estado_Taller'].str.contains("ENTREGADO PEND FACT", na=False)]
+        # --- SECCIÓN 2: GRÁFICOS GRANDES (Plotly - Mimic Jujuy sin grupos) ---
         
-        costo_pend_repuestos = df_tpf['Costo'].sum() + df_tpe['Costo'].sum() + df_epf['Costo'].sum()
-
-        st.write("### 3️⃣ Detalle de Estados Pendientes (Plata Inmovilizada)")
-        c_e1, c_e2, c_e3, c_e4 = st.columns(4)
-        c_e1.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Facturar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpf["Precio"].sum())}</div><div class="metric-subtitle-red">⚠️ {df_tpf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e2.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Entregar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpe["Precio"].sum())}</div><div class="metric-subtitle-blue">⏳ {df_tpe["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e3.markdown(f'<div class="metric-card"><div class="metric-title">Entreg. Pend. Facturar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_epf["Precio"].sum())}</div><div class="metric-subtitle-green">🚚 {df_epf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e4.markdown(f'<div class="metric-card" style="background-color: #fff3cd; border: 1px solid #ffeeba;"><div class="metric-title" style="color: #856404;">Repuestos Pendientes</div><div class="metric-value-money" style="font-size: 1.4rem; color: #856404;">{formato_pesos(costo_pend_repuestos)}</div><div class="metric-subtitle-gray" style="color: #856404;">⚙️ En autos sin facturar</div></div>', unsafe_allow_html=True)
+        # A. Curva de Producción (Gantt)
+        st.markdown("### 🗓️ Curva de Producción y Facturación")
         
-        # --- 4. Curva de Producción ---
         if mes_filtro != "TODOS":
-            st.markdown("### 4️⃣ Curva de Producción y Facturación del Mes (MO)")
-            primer_dia = date(año_filtro, mes_num_filtro, 1)
-            _, ult_dia = calendar.monthrange(año_filtro, mes_num_filtro)
-            fechas_mes = [date(año_filtro, mes_num_filtro, d) for d in range(1, ult_dia + 1)]
-
-            df_dias = pd.DataFrame({'Fecha': fechas_mes})
-            df_dias['Es_Habil'] = df_dias['Fecha'].apply(lambda x: x.weekday() < 5 and x not in FERIADOS_ARG)
-            df_habiles = df_dias[df_dias['Es_Habil']].copy()
-            df_habiles['Dia_Habil_Num'] = range(1, len(df_habiles) + 1)
-            df_habiles['Meta Lineal (Paños)'] = df_habiles['Dia_Habil_Num'] * CAPACIDAD_DIARIA_TALLER
-
-            df_proyeccion = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+            df_gantt = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+            df_gantt = df_gantt.dropna(subset=['Fecha_Promesa_Disp'])
             
-            def asignar_fecha_curva(row):
-                f = row['Fecha_Promesa_Disp']
-                if pd.isna(f) or f.month != mes_num_filtro or f.year != año_filtro:
-                    return hoy.date() if hoy.month == mes_num_filtro else primer_dia
-                return f
-
-            df_proyeccion['Fecha_Curva'] = df_proyeccion.apply(asignar_fecha_curva, axis=1)
-            df_proyeccion['Es_Hecho'] = df_proyeccion['Estado_Taller'].str.contains('ENTREGADO|TERM', na=False) | (df_proyeccion['Estado_Resumen'] == 'Facturado (FAC)')
-
-            agrupado = df_proyeccion.groupby('Fecha_Curva').agg(Paños_Esperados=('Paños', 'sum')).reset_index()
-            agrupado_hecho = df_proyeccion[df_proyeccion['Es_Hecho']].groupby('Fecha_Curva').agg(Paños_Hechos=('Paños', 'sum')).reset_index()
-
-            df_habiles = df_habiles.merge(agrupado, left_on='Fecha', right_on='Fecha_Curva', how='left').fillna(0)
-            df_habiles = df_habiles.merge(agrupado_hecho, left_on='Fecha', right_on='Fecha_Curva', how='left').fillna(0)
-
-            df_habiles['1. Proyección Esperada (SI+FAC)'] = df_habiles['Paños_Esperados'].cumsum()
-            df_habiles['2. Avance Real Hecho'] = df_habiles['Paños_Hechos'].cumsum()
-            df_habiles.loc[df_habiles['Fecha'] > hoy.date(), '2. Avance Real Hecho'] = None
-
-            fig = go.Figure()
-            fig.add_trace(go.Scatter(x=df_habiles['Fecha'], y=df_habiles['Meta Lineal (Paños)'], name='Meta Exigida (Lineal)', mode='lines', line=dict(color='gray', dash='dash', width=2)))
-            fig.add_trace(go.Scatter(x=df_habiles['Fecha'], y=df_habiles['1. Proyección Esperada (SI+FAC)'], name='Proyección según Fechas (Ideal)', mode='lines+markers', line=dict(color='#00A8E8', width=2), marker=dict(size=6, color='#00A8E8')))
-            fig.add_trace(go.Scatter(x=df_habiles['Fecha'], y=df_habiles['2. Avance Real Hecho'], name='Avance Real al Día de Hoy', mode='lines+markers', line=dict(color='#28a745', width=4), marker=dict(size=8, color='#1e7e34')))
-            fig.update_layout(title="Curva de Acumulación de Trabajo (Mes)", xaxis_title="Días Hábiles", yaxis_title="Cantidad de Paños Acumulados", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
-            st.plotly_chart(fig, use_container_width=True)
-
-        # --- 5. Listados Detallados ---
-        st.divider()
-        st.markdown("### 5️⃣ Listados Detallados de Producción")
-        t_ase, t_emp, t_rep = st.tabs(["👔 Por Asesor", "🏢 Por Empresa", "⚙️ Repuestos"])
-        with t_ase:
-            df_ase = df_analisis.groupby('Asesor').agg(Autos=('Patente','count'), Paños=('Paños','sum'), Facturación=('Precio','sum')).reset_index().sort_values('Facturación', ascending=False)
-            c_graf1, c_tab1 = st.columns([3, 2])
-            with c_graf1:
-                fig_ase = px.bar(df_ase, x='Asesor', y='Facturación', text_auto='$.3s', title='Facturación de Mano de Obra por Asesor', color_discrete_sequence=['#17a2b8'])
-                st.plotly_chart(fig_ase, use_container_width=True)
-            with c_tab1:
-                st.dataframe(df_ase, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Fact. ($)", format="$ %d")})
-        with t_emp:
-            df_emp = df_analisis.groupby('Cliente').agg(Autos=('Patente','count'), Paños=('Paños','sum'), Facturación=('Precio','sum')).reset_index().sort_values('Facturación', ascending=False)
-            c_graf2, c_tab2 = st.columns([3, 2])
-            with c_graf2:
-                fig_emp = px.bar(df_emp, x='Cliente', y='Facturación', text_auto='$.3s', title='Facturación de Mano de Obra por Empresa', color_discrete_sequence=['#6f42c1'])
-                st.plotly_chart(fig_emp, use_container_width=True)
-            with c_tab2:
-                st.dataframe(df_emp, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Fact. ($)", format="$ %d")})
-        with t_rep:
-            df_rep = df_analisis[df_analisis['Costo'] > 0][['Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Costo', 'Estado_Taller']].sort_values('Costo', ascending=False)
-            if not df_rep.empty:
-                st.dataframe(df_rep, hide_index=True, use_container_width=True, column_config={"Costo": st.column_config.NumberColumn("Costo / Repuestos ($)", format="$ %d")})
+            # Gráfico Gantt de Jujuy modificado sin grupos
+            if not df_gantt.empty:
+                df_gantt['Vehiculo_Label'] = df_gantt['Vehiculo'].str[:12] + " (" + df_gantt['Asesor'] + ")"
+                df_gantt = df_gantt.sort_values(by=['Fecha_Promesa_Disp', 'Hora_Entrega'])
+                
+                fig_gantt = px.timeline(df_gantt, 
+                                      x_start="Inicio", 
+                                      x_end="Fin", 
+                                      y="Vehiculo_Label", 
+                                      color="Estado_Resumen",
+                                      text="Patente",
+                                      color_discrete_map={'Facturado (FAC)':'#1e7e34', 'Aprobado (SI)':'#17a2b8'},
+                                      labels={"Vehiculo_Label": "Unidad (Asesor)", "Estado_Resumen": "Estado Fac."})
+                
+                fig_gantt.update_layout(xaxis_title="Fecha de Entrega", 
+                                        yaxis_title=None,
+                                        height=min(600, 100 + 20 * len(df_gantt)),
+                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+                
+                fig_gantt.update_yaxes(categoryorder="total ascending")
+                fig_gantt.update_traces(textposition='inside', insidetextanchor='middle', opacity=0.85)
+                
+                st.plotly_chart(fig_gantt, use_container_width=True)
             else:
-                st.info("No hay costos de repuestos cargados en este período.")
-
-        # --- 6. Gestión Financiera de Terceros ---
-        st.divider()
-        st.markdown("### 6️⃣ Gestión Financiera de Terceros")
-        df_terceros = df_analisis[df_analisis['Costo'] > 0]
-        if not df_terceros.empty:
-            costo_total = df_terceros['Costo'].sum()
-            st.metric("Total Gastos a Terceros / Costos del Período", formato_pesos(costo_total))
+                st.info("No hay vehículos FAC/SI con fecha de entrega para armar la curva.")
+        
+        # B. Gráficos de Barra (Stacked Bars - Mimic Jujuy apilando por Cliente/Particular)
+        st.markdown("### 📈 Análisis de Producción Detallado")
+        
+        c_graf1, c_graf2 = st.columns(2)
+        
+        with c_graf1:
+            # Gráfico de Paños por Asesor (Stack Particular vs Empresas)
+            st.markdown("<p style='text-align: center; font-weight: bold;'>Producción Paños por Asesor (FAC+SI)</p>", unsafe_allow_html=True)
+            df_bar_paños = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
             
-            col_t1, col_t2 = st.columns(2)
-            with col_t1:
-                st.write("**Distribución por Estado del Taller**")
-                df_ter_est = df_terceros.groupby('Estado_Taller').agg(Autos=('Patente','count'), Costo_Total=('Costo','sum')).reset_index().sort_values('Costo_Total', ascending=False)
-                st.dataframe(df_ter_est, hide_index=True, use_container_width=True, column_config={"Costo_Total": st.column_config.NumberColumn("Costo Total ($)", format="$ %d")})
-            with col_t2:
-                st.write("**Distribución por Asesor**")
-                df_ter_ase = df_terceros.groupby('Asesor').agg(Costo_Total=('Costo','sum')).reset_index().sort_values('Costo_Total', ascending=False)
-                st.dataframe(df_ter_ase, hide_index=True, use_container_width=True, column_config={"Costo_Total": st.column_config.NumberColumn("Costo Total ($)", format="$ %d")})
+            # Simplificamos clientes como Jujuy (Particular vs Empresas)
+            df_bar_paños['stackParticular'] = df_bar_paños['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas')
+            
+            # Gráfico de Jujuy modificado
+            fig_paños_ase = px.bar(df_bar_paños, 
+                                  x="Asesor", 
+                                  y="Paños", 
+                                  color="stackParticular",
+                                  title=None,
+                                  labels={"stackParticular": "Cliente"},
+                                  text_auto='.1f',
+                                  color_discrete_map={'Particular':'#6c757d', 'Empresas':'#00235d'})
+            
+            fig_paños_ase.update_layout(xaxis_title=None, 
+                                        yaxis_title="Cantidad Paños",
+                                        height=400,
+                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_paños_ase, use_container_width=True)
+            
+        with c_graf2:
+            # Gráfico de Pesos por Asesor (Stack Particular vs Empresas)
+            st.markdown("<p style='text-align: center; font-weight: bold;'>Facturación Pesos (M.O.) por Asesor (FAC+SI)</p>", unsafe_allow_html=True)
+            df_bar_pesos = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+            df_bar_pesos['stackParticular'] = df_bar_pesos['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas')
+
+            # Gráfico de Jujuy modificado
+            fig_pesos_ase = px.bar(df_bar_pesos, 
+                                  x="Asesor", 
+                                  y="Precio", 
+                                  color="stackParticular",
+                                  title=None,
+                                  labels={"stackParticular": "Cliente"},
+                                  text_auto='$.2s', # Formato Jujuy k/M
+                                  color_discrete_map={'Particular':'#6c757d', 'Empresas':'#1e7e34'}) # Verde oscuro para pesos empresas
+            
+            fig_pesos_ase.update_layout(xaxis_title=None, 
+                                        yaxis_title="Pesos M.O. ($)",
+                                        height=400,
+                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            st.plotly_chart(fig_pesos_ase, use_container_width=True)
+        
+        st.divider()
+
+        # --- SECCIÓN 3: DETALLES EXPANSIBLES (Salta Style) ---
+        st.markdown("### 📑 Listados Detallados")
+        
+        # A. Detalle FAC
+        with st.expander("Ver Detalle Facturado Actual (FAC)", expanded=False):
+            if not df_fac.empty:
+                # Columnas de Jujuy
+                df_fac_disp = df_fac[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Seguro', 'Precio', 'Costo', 'Paños']].sort_values(by='Precio', ascending=False)
+                st.dataframe(df_fac_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
+            else:
+                st.info("No hay vehículos facturados en el período.")
+        
+        # B. Detalle SI
+        with st.expander("Ver Detalle Aprobado (SI)", expanded=False):
+            if not df_si.empty:
+                df_si_disp = df_si[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Seguro', 'Precio', 'Costo', 'Paños', 'Estado_Taller']].sort_values(by='Precio', ascending=False)
+                st.dataframe(df_si_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
+            else:
+                st.info("No hay vehículos aprobados (SI) en el período.")
+        
+        # C. Plata en Taller (Inmovilizada - Mimic Jujuy simple)
+        with st.expander("Ver Plata en Taller (Inmovilizada)", expanded=False):
+            df_taller = df_analisis[~df_analisis['Estado_Resumen'].isin(['Facturado (FAC)'])].copy()
+            if not df_taller.empty:
+                # Calculamos inmovilizado
+                st.write(f"Vehículos en Taller/Aprobados (No Facturados): **{len(df_taller)} Unidades** | M.O.: **{formato_pesos(df_taller['Precio'].sum())}** | Repuestos: **{formato_pesos(df_taller['Costo'].sum())}**")
+                df_taller_disp = df_taller[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Estado_Taller', 'Paños', 'Precio', 'Costo', 'Fecha_Promesa_Disp']].sort_values(by='Fecha_Promesa_Disp')
+                st.dataframe(df_taller_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
+            else:
+                st.success("Taller al día. No hay plata inmovilizada en taller fuera de la selección.")
+
+        st.divider()
+
+        # --- SECCIÓN 4: HISTÓRICO (Jujuy Histórico Table - Salta Groups SOL/LUX/CIEL) ---
+        st.markdown("### 📅 Facturación Histórica Mensual")
+        
+        if not df_completo.empty:
+            df_hist = df_completo.copy()
+            # Mantenemos grupos de Salta (SOL/LUX/CIEL/Particular) para el histórico como Jujuy
+            df_hist['Cliente_Hist'] = df_hist['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas SOL/LUX/CIEL')
+            
+            if 'Mes_Hist' in df_hist.columns and not df_hist['Mes_Hist'].empty:
+                # Pivot de Paños
+                pivot_panos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Paños', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
+                
+                if not pivot_panos.empty:
+                    st.write("**Paños Facturados Histórico**")
+                    pivot_panos['Total'] = pivot_panos.sum(axis=1)
+                    pivot_panos = pivot_panos.sort_index(ascending=False)
+                    
+                    st.dataframe(pivot_panos.style.format("{:.1f}").applymap(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#00235d', 'color': 'white'}, subset=['Total']).applymap(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
+                    
+                    # Pivot de Pesos (Total Mo + Rep)
+                    df_hist['Total_Pesos'] = df_hist['Precio'] + df_hist['Costo']
+                    pivot_pesos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Total_Pesos', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
+                    
+                    st.write("**Pesos Totales ($) Facturados Histórico**")
+                    pivot_pesos['Total'] = pivot_pesos.sum(axis=1)
+                    pivot_pesos = pivot_pesos.sort_index(ascending=False)
+                    
+                    st.dataframe(pivot_pesos.style.format(formato_pesos).applymap(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#1e7e34', 'color': 'white'}, subset=['Total']).applymap(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
+                else:
+                    st.info("No hay datos históricos facturados suficientes.")
+            else:
+                st.warning("No hay datos de Mes Histórico disponibles.")
         else:
-            st.info("No se registran gastos de terceros en la selección actual.")
-
-        # --- 7. Radar del Mes Siguiente ---
-        st.divider()
-        st.write("### 7️⃣ Radar del Mes Siguiente (Estado 'NO')")
-        df_no = df_completo[df_completo['Estado_Fac'] == 'NO'].copy()
-        if not df_no.empty:
-            c_n1, c_n2, c_n3 = st.columns(3)
-            c_n1.markdown(f'<div class="metric-card"><div class="metric-title">Autos para Próx. Mes</div><div class="metric-value-number" style="color:#6f42c1;">{df_no["Patente"].count()}</div></div>', unsafe_allow_html=True)
-            c_n2.markdown(f'<div class="metric-card"><div class="metric-title">Paños Asegurados</div><div class="metric-value-number" style="color:#6f42c1;">{df_no["Paños"].sum():.1f}</div></div>', unsafe_allow_html=True)
-            c_n3.markdown(f'<div class="metric-card"><div class="metric-title">Plata Proyectada</div><div class="metric-value-money" style="color:#6f42c1;">{formato_pesos(df_no["Precio"].sum())}</div></div>', unsafe_allow_html=True)
-        else: st.info("No hay vehículos marcados con 'NO' para el mes que viene.")
-
-        # --- 8. Auditoría de Datos ---
-        st.divider()
-        st.markdown("### 8️⃣ Auditoría de Datos")
-        with st.expander("Ver Auditoría de Datos Incompletos", expanded=False):
-            df_audit = df_analisis[(df_analisis['Precio'] == 0) | (df_analisis['Paños'] == 0) | (df_analisis['Estado_Taller'] == 'SIN ESTADO') | (df_analisis['Estado_Taller'] == '')].copy()
-            if not df_audit.empty:
-                st.warning(f"⚠️ Se detectaron {len(df_audit)} registros con datos faltantes (Precio en $0, 0 paños, o sin estado cargado):")
-                st.dataframe(df_audit[['Patente', 'Vehiculo', 'Asesor', 'Paños', 'Precio', 'Estado_Taller']], hide_index=True, use_container_width=True)
-            else:
-                st.success("¡Excelente! Todos los registros del período tienen precio, paños y estado asignado correctamente.")
+            st.info("No hay datos históricos disponibles.")
 
 # ==========================================
 # PESTAÑA 5: KPIs
