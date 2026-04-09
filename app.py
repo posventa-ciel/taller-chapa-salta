@@ -1069,6 +1069,7 @@ with tab_fac:
     if not df.empty:
         st.subheader("🎯 Análisis de Facturación, Paños y Objetivos")
         
+        # --- PREPARACIÓN DE DATOS Y FILTRO DE MES ---
         df_analisis = df.copy()
         
         def clasificar_estado(row):
@@ -1082,6 +1083,14 @@ with tab_fac:
             
         df_analisis['Estado_Resumen'] = df_analisis.apply(clasificar_estado, axis=1)
 
+        # ⚠️ EL ARREGLO CLAVE: Filtramos los datos POR MES ANTES de sumar la plata.
+        # Usamos la Fecha Promesa (o la Fecha Taller si existe) para definir a qué mes pertenece.
+        df_analisis['Fecha_Para_Mes'] = pd.to_datetime(df_analisis['Fecha_Taller'].fillna(df_analisis['Fecha_Promesa_Disp']), errors='coerce')
+        
+        if mes_filtro != "TODOS":
+            df_analisis = df_analisis[df_analisis['Fecha_Para_Mes'].dt.month == mes_num_filtro]
+
+        # Separamos los estados ya filtrados por el mes correcto
         df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
         
@@ -1089,6 +1098,7 @@ with tab_fac:
         fac_mo, fac_rep = df_fac['Precio'].sum(), df_fac['Costo'].sum()
         si_mo, si_rep = df_si['Precio'].sum(), df_si['Costo'].sum()
         
+        # Volvemos a tu diseño preferido: EL TOTAL GIGANTE ARRIBA
         pesos_fac = fac_mo + fac_rep
         pesos_si = si_mo + si_rep
         pesos_est = pesos_fac + pesos_si
@@ -1116,7 +1126,7 @@ with tab_fac:
         st.write("### 💰 Rendimiento y Proyección al Cierre")
         c_r1, c_r2, c_r3 = st.columns(3)
         
-        # Tarjetas estilo Salta (Fondo blanco, borde color)
+        # Tarjetas estilo Salta (Fondo blanco, borde color) - MUESTRA EL TOTAL GRANDE Y DESGLOSE ABAJO
         c_r1.markdown(f'''
         <div class="metric-card" style="background-color: white; border-left: 5px solid #28a745;">
             <div class="metric-title" style="color: #28a745;">Facturado Actual (FAC)</div>
