@@ -880,12 +880,12 @@ with tab_turnos:
 # PESTAÑA 2: PROGRAMACIÓN Y KANBAN
 # ==========================================
 with tab_prog:
-    st.subheader("🛠️ Programación y Flujo de Trabajo (Mano de Obra)")
+    st.subheader("🛠️ Programación y Flujo de Trabajo")
     if not df.empty:
         col_filtro, _ = st.columns([1, 2])
         with col_filtro: asesor_filtro_prog = st.selectbox("👔 Filtrar por Asesor", ["TODOS"] + ASESORES_LISTA, key="filtro_asesor_prog")
             
-        df_prog_filtrado = df[df['Grupo'].isin(['GRUPO', 'PULIDOS'])].copy()
+        df_prog_filtrado = df.copy()
         if asesor_filtro_prog != "TODOS":
             nombre_corto = asesor_filtro_prog.split()[0].upper()
             df_prog_filtrado = df_prog_filtrado[df_prog_filtrado['Asesor'].str.contains(nombre_corto, case=False, na=False)]
@@ -893,15 +893,9 @@ with tab_prog:
         df_en_proceso = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO", na=False)]
         
         st.markdown(f"### 🚥 Termómetro de Capacidad (Mes de {DIAS_HABILES_MES} días hábiles)")
-        st.write(f"Calculado en base a los **Paños Activos** divididos por la capacidad teórica de producción ({CAPACIDAD_DIARIA_GRUPO:.1f} paños/día por sector). No incluye detenidos.")
-        
         if not df_en_proceso.empty:
             resumen_capacidad = df_en_proceso.groupby('Grupo').agg(Autos=('Patente', 'count'), Panos_Activos=('Paños', 'sum')).reset_index()
             resumen_capacidad['Dias_Carga_Real'] = resumen_capacidad['Panos_Activos'] / CAPACIDAD_DIARIA_GRUPO
-            
-            orden_grupos_maestro = ["GRUPO", "PULIDOS"]
-            resumen_capacidad['Orden'] = resumen_capacidad['Grupo'].apply(lambda x: orden_grupos_maestro.index(x) if x in orden_grupos_maestro else 99)
-            resumen_capacidad = resumen_capacidad.sort_values('Orden').drop(columns=['Orden'])
             
             cols_cap = st.columns(len(resumen_capacidad))
             for i, row in resumen_capacidad.reset_index(drop=True).iterrows():
@@ -914,19 +908,14 @@ with tab_prog:
                         <h4 style='color: #00235d; margin-top: 0;'>{row['Grupo']}</h4>
                         <h1 style='color: {color_dias}; margin: 10px 0;'>{dias_reales:.1f} Días</h1>
                         <p style='color: #17a2b8; font-weight: bold; font-size: 1.1em; margin-bottom: 0;'>📅 Libre aprox: {fecha_libre}</p>
-                        <hr style='margin: 10px 0;'>
-                        <div style='display: flex; justify-content: space-around;'>
-                            <span style='font-size: 0.9em;'>🚗 {row['Autos']} autos</span>
-                            <span style='font-size: 0.9em;'>📦 {row['Panos_Activos']:.1f} paños</span>
-                        </div>
+                        <hr style='margin: 10px 0;'><div style='display: flex; justify-content: space-around;'><span>🚗 {row['Autos']} autos</span><span>📦 {row['Panos_Activos']:.1f} paños</span></div>
                     </div>
                     """, unsafe_allow_html=True)
-        else: st.info("No hay vehículos en proceso para calcular capacidad.")
+        else: st.info("No hay vehículos en proceso.")
 
         st.divider()
 
-        st.markdown("## 📑 Listado de Vehículos en Taller (Prioridad por Fecha Promesa)")
-        
+        st.markdown("## 📑 Listado de Vehículos en Taller por Estado")
         estados_map = [
             ("⏳ EN PROCESO", "PROCESO"), 
             ("⛔ DETENIDOS", "DETENIDO"), 
@@ -939,131 +928,65 @@ with tab_prog:
         for titulo, match_key in estados_map:
             if "DETENIDO" in match_key: st.error(f"#### {titulo}")
             else: st.markdown(f"#### {titulo}")
-            col1, col2 = st.columns(2)
             
-            def dibujar_tabla(col, grupo_nombre, m_key):
-                d_g = df_prog_filtrado[df_prog_filtrado['Grupo'] == grupo_nombre].copy()
-                if m_key == "ENTREGADO_FINAL":
-                    d_e = d_g[(d_g['Estado_Taller'].str.contains("ENTREGADO", na=False)) & (~d_g['Estado_Taller'].str.contains("PEND", na=False))].copy()
+            d_g = df_prog_filtrado.copy()
+            if match_key == "ENTREGADO_FINAL":
+                d_e = d_g[(d_g['Estado_Taller'].str.contains("ENTREGADO", na=False)) & (~d_g['Estado_Taller'].str.contains("PEND", na=False))].copy()
+            else:
+                d_e = d_g[d_g['Estado_Taller'].str.contains(match_key, na=False)].copy()
+                
+            if not d_e.empty:
+                d_e = d_e.sort_values(by='Fin', ascending=True, na_position='last')
+                d_e['F. Ingreso'] = d_e['Fecha_Ingreso'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
+                d_e['1ra Promesa'] = d_e['Fecha_Ticket'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
+                d_e['F. Entrega'] = d_e['Fecha_Promesa_Disp'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
+                
+                if "TERM" in match_key or "ENTREGADO" in match_key:
+                    cols_to_show = ['F. Ingreso', '1ra Promesa', 'F. Entrega', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Paños', 'Precio', 'Observaciones']
                 else:
-                    d_e = d_g[d_g['Estado_Taller'].str.contains(m_key, na=False)].copy()
+                    cols_to_show = ['F. Ingreso', '1ra Promesa', 'F. Entrega', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Paños', 'Observaciones']
                     
-                with col:
-                    st.caption(f"**{grupo_nombre}**")
-                    if not d_e.empty:
-                        d_e = d_e.sort_values(by='Fin', ascending=True, na_position='last')
-                        d_e['F. Ingreso'] = d_e['Fecha_Ingreso'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
-                        d_e['1ra Promesa'] = d_e['Fecha_Ticket'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
-                        d_e['F. Entrega'] = d_e['Fecha_Promesa_Disp'].apply(lambda x: x.strftime('%d/%m') if pd.notna(x) else "")
-                        
-                        if "TERM" in m_key or "ENTREGADO" in m_key:
-                            cols_to_show = ['F. Ingreso', '1ra Promesa', 'F. Entrega', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Paños', 'Precio', 'Observaciones']
-                        else:
-                            cols_to_show = ['F. Ingreso', '1ra Promesa', 'F. Entrega', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Paños', 'Observaciones']
-                            
-                        df_vista = d_e[cols_to_show]
-                        st.dataframe(
-                            df_vista, 
-                            hide_index=True, 
-                            use_container_width=True, 
-                            column_config={
-                                "Hora_Entrega": st.column_config.TextColumn("Hs"),
-                                "Precio": st.column_config.NumberColumn("Monto ($)", format="$ %d"),
-                                "Observaciones": st.column_config.TextColumn("Observaciones", width="medium")
-                            },
-                            key=f"{grupo_nombre}_{m_key}_{asesor_filtro_prog}_detalle"
-                        )
-                    else: st.caption("Sin vehículos en este estado.")
-                    
-            dibujar_tabla(col1, "GRUPO", match_key)
-            dibujar_tabla(col2, "PULIDOS", match_key)
+                st.dataframe(d_e[cols_to_show], hide_index=True, use_container_width=True, column_config={"Hora_Entrega": st.column_config.TextColumn("Hs"), "Precio": st.column_config.NumberColumn("Monto ($)", format="$ %d"), "Observaciones": st.column_config.TextColumn("Observaciones", width="medium")})
+            else: st.caption("Sin vehículos en este estado.")
             st.markdown("<br>", unsafe_allow_html=True)
-        
+
         st.divider()
 
-        st.markdown("### 📋 Tablero Kanban de Producción (Mano de Obra)")
-        st.write("Los vehículos fluyen de izquierda a derecha. **Prioridad por colores:** 🟢 Con tiempo | 🟡 Entrega HOY | 🔴 Atrasado | ⚪ Detenido.")
-        
+        st.markdown("### 📋 Tablero Kanban - Taller Salta")
         df_kanban = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO|DETENIDO", na=False)].copy()
         df_kanban.loc[df_kanban['Estado_Taller'].str.contains("DETENIDO", na=False), 'Fase_Taller'] = "⛔ DETENIDOS"
         
-        df_kanban['Fase_Taller'] = df_kanban['Fase_Taller'].str.strip().str.upper()
-        df_kanban['Fase_Taller'] = df_kanban['Fase_Taller'].replace({"PREPARACION": "PREPARACIÓN"})
-        
+        # ACA ESTA CORREGIDO: SE SACO PULIDO DE LA LISTA
         orden_ideal = ["SIN FASE ASIGNADA", "CHAPA", "PREPARACION", "PINTURA", "ARMADO", "⛔ DETENIDOS"]
         
-        grupos_presentes = ["GRUPO", "PULIDOS"]
-
-        hoy_kanban = datetime.today().date()
-
-        for grupo in grupos_presentes:
-            st.markdown(f"<h4 style='color: #00235d; margin-top: 25px; border-bottom: 2px solid #00235d; padding-bottom: 5px;'>🏭 Sector: {grupo}</h4>", unsafe_allow_html=True)
-            df_grupo_kanban = df_kanban[df_kanban['Grupo'] == grupo]
-
-            cols_kanban = st.columns(len(orden_ideal))
-            for idx, fase in enumerate(orden_ideal):
-                with cols_kanban[idx]:
-                    st.markdown(f"<div class='kanban-col' style='padding: 5px;'><h5 style='text-align:center; color:#00235d; margin: 0; font-size: 0.85rem;'>{fase}</h5></div>", unsafe_allow_html=True)
-                    df_fase = df_grupo_kanban[df_grupo_kanban['Fase_Taller'] == fase]
-                    
-                    if not df_fase.empty:
-                        for _, row in df_fase.iterrows():
-                            f_prom = row.get('Fecha_Promesa_Disp')
+        cols_kanban = st.columns(len(orden_ideal))
+        for idx, fase in enumerate(orden_ideal):
+            with cols_kanban[idx]:
+                st.markdown(f"<div class='kanban-col'><h5 style='text-align:center; color:#00235d; margin: 0; font-size: 0.85rem;'>{fase}</h5></div>", unsafe_allow_html=True)
+                
+                if fase == "SIN FASE ASIGNADA": df_fase = df_kanban[(df_kanban['Fase_Taller'] == "") | (df_kanban['Fase_Taller'].isna()) | (df_kanban['Fase_Taller'] == "SIN FASE ASIGNADA")]
+                else: df_fase = df_kanban[df_kanban['Fase_Taller'].str.contains(fase[:4], na=False, case=False)]
+                
+                if not df_fase.empty:
+                    for _, row in df_fase.iterrows():
+                        f_prom = row.get('Fecha_Promesa_Disp')
+                        if fase == "⛔ DETENIDOS": color_borde, circulo, texto_fecha = "#6c757d", "⚪", "Detenido"
+                        else:
+                            if pd.isna(f_prom) or not f_prom: color_borde, circulo, texto_fecha = "#17a2b8", "🔵", "Sin fecha"
+                            elif f_prom < hoy.date(): color_borde, circulo, texto_fecha = "#dc3545", "🔴", f_prom.strftime('%d/%m')
+                            elif f_prom == hoy.date(): color_borde, circulo, texto_fecha = "#ffc107", "🟡", f_prom.strftime('%d/%m')
+                            else: color_borde, circulo, texto_fecha = "#28a745", "🟢", f_prom.strftime('%d/%m')
                             
-                            if fase == "⛔ DETENIDOS":
-                                color_borde = "#6c757d" 
-                                circulo = "⚪"
-                                texto_fecha = "Detenido"
-                            else:
-                                if pd.isna(f_prom) or not f_prom:
-                                    color_borde = "#17a2b8" 
-                                    circulo = "🔵"
-                                    texto_fecha = "Sin fecha"
-                                elif f_prom < hoy_kanban:
-                                    color_borde = "#dc3545" 
-                                    circulo = "🔴"
-                                    texto_fecha = f_prom.strftime('%d/%m')
-                                elif f_prom == hoy_kanban:
-                                    color_borde = "#ffc107" 
-                                    circulo = "🟡"
-                                    texto_fecha = f_prom.strftime('%d/%m')
-                                else:
-                                    color_borde = "#28a745" 
-                                    circulo = "🟢"
-                                    texto_fecha = f_prom.strftime('%d/%m')
-                                    
-                            asesor_corto = row['Asesor'].split()[0] if row['Asesor'] else "N/A"
-                            
-                            novedad_html = ""
-                            if fase == "⛔ DETENIDOS" and str(row.get('Observaciones', '')).strip() != "" and str(row.get('Observaciones', '')).lower() != "nan":
-                                novedad_html = f"<div style='margin-top: 5px; font-size: 0.85em; color: #721c24; background-color: #f8d7da; padding: 4px; border-radius: 4px; border: 1px solid #f5c6cb;'><strong>Novedad:</strong> {str(row['Observaciones'])}</div>"
-                            
-                            st.markdown(f"""
-                            <div style='background: white; padding: 8px; margin-top: 8px; border-radius: 5px; border-left: 5px solid {color_borde}; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); font-size: 0.9em;'>
-                                <div style='display: flex; justify-content: space-between; align-items: center;'>
-                                    <strong>{row['Patente']}</strong>
-                                    <span title='Fecha Promesa' style='font-size: 0.9em; font-weight: bold;'>{circulo} {texto_fecha}</span>
-                                </div>
-                                <span style='font-size: 0.85em;'>{row['Vehiculo'][:15]}</span><br>
-                                <span style='font-size: 0.8em; color: gray;'>📦 {row['Paños']} p. | Asesor: {asesor_corto}</span>
-                                {novedad_html}
-                            </div>
-                            """, unsafe_allow_html=True)
-                    else: 
-                        st.caption("")
-
-        st.divider()
-        
-        st.markdown("### 📊 Análisis de Carga por Método Toyota (ABC)")
-        if not df_en_proceso.empty:
-            c_abc1, c_abc2 = st.columns([1, 2])
-            with c_abc1:
-                resumen_abc = df_en_proceso.groupby('Tipo_ABC')['Patente'].count().reset_index().rename(columns={'Patente': 'Cant. Vehículos'})
-                st.dataframe(resumen_abc, hide_index=True, use_container_width=True)
-            with c_abc2:
-                fig_abc = px.pie(resumen_abc, values='Cant. Vehículos', names='Tipo_ABC', hole=0.4, title="Vehículos EN PROCESO por Clasificación ABC", color_discrete_sequence=['#28a745', '#ffc107', '#dc3545'])
-                st.plotly_chart(fig_abc, use_container_width=True)
-
+                        novedad_html = f"<div style='margin-top: 5px; font-size: 0.85em; color: #721c24; background-color: #f8d7da; padding: 4px; border-radius: 4px;'><strong>Novedad:</strong> {str(row['Observaciones'])}</div>" if fase == "⛔ DETENIDOS" and str(row.get('Observaciones', '')).strip() != "" and str(row.get('Observaciones', '')).lower() != "nan" else ""
+                        
+                        st.markdown(f"""
+                        <div style='background: white; padding: 8px; margin-top: 8px; border-radius: 5px; border-left: 5px solid {color_borde}; box-shadow: 1px 1px 3px rgba(0,0,0,0.1); font-size: 0.9em;'>
+                            <div style='display: flex; justify-content: space-between;'><strong>{row['Patente']}</strong><span>{circulo} {texto_fecha}</span></div>
+                            <span style='font-size: 0.85em;'>{row['Vehiculo'][:15]}</span><br>
+                            <span style='font-size: 0.8em; color: gray;'>📦 {row['Paños']} p. | {row['Asesor'].split()[0] if row['Asesor'] else 'N/A'}</span>
+                            {novedad_html}
+                        </div>
+                        """, unsafe_allow_html=True)
 # ==========================================
 # PESTAÑA 3: PORTAL EMPRESAS 
 # ==========================================
