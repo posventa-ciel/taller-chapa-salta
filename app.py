@@ -11,16 +11,11 @@ import gspread
 
 # --- VARIABLES SALTA ---
 ID_PLANILLA = "1yVeTn7UJV5izBURIXFjROwnH1xD8L3vDpesPVZzy45c"
-GIDS = {"TALLER SALTA": "609774337"} # Salta tiene un solo grupo principal
+GIDS = {"TALLER SALTA": "609774337"} 
 URL_BASE = f"https://docs.google.com/spreadsheets/d/{ID_PLANILLA}/export?format=csv&gid="
 
-# ⚠️ ATENCIÓN: CAMBIAR ESTOS NOMBRES POR LOS DE SALTA
-ASESORES_LISTA = ["SIN ASIGNAR", "ASESOR SALTA 1", "ASESOR SALTA 2"] 
-CLIENTES_LISTA = ["PARTICULAR", "AUTOSOL", "AUTOLUX", "CIEL"]
 OBJETIVO_MENSUAL_PANOS = 300.0 # Ajustá el objetivo de Salta acá
-
-# GID de Turnos (Dejar vacío o poner el de Salta si tienen uno)
-GID_TURNOS = "PONER_AQUI_GID_TURNOS" 
+GID_TURNOS = "PONER_AQUI_GID_TURNOS" # GID de Turnos (Dejar vacío o poner el de Salta si tienen uno)
 
 # --- CONEXIÓN A GOOGLE SHEETS ---
 try:
@@ -31,7 +26,7 @@ try:
     try:
         hoja = planilla.worksheet("TURNOS")
     except:
-        hoja = None # Si no hay pestaña TURNOS, no rompe
+        hoja = None 
 except Exception as e:
     st.error(f"Error de conexión a Google Sheets: {e}")
     hoja = None
@@ -118,8 +113,6 @@ def obtener_proxima_fecha_libre(dias_carga):
 @st.cache_data(ttl=300)
 def obtener_turnos():
     columnas_base = ['Tipo', 'Fecha', 'Hora', 'Vehiculo', 'Patente', 'Asesor', 'Precio', 'Paños', 'Observaciones', 'Tiempo_Entrega', 'Cliente', 'Seguro', 'Ticket', 'Recibido', 'Fotos', 'Referencia', 'Cancelado', 'Motivo_Cancelacion', 'Eliminar']
-    if GID_TURNOS == "PONER_AQUI_GID_TURNOS": return pd.DataFrame(columns=columnas_base)
-    # Lógica de turnos original omitida para ahorrar espacio, se mantiene igual si la activás
     return pd.DataFrame(columns=columnas_base) 
 
 @st.cache_data(ttl=300)
@@ -129,7 +122,6 @@ def obtener_datos_maestros():
         try:
             d_raw = pd.read_csv(f"{URL_BASE}{gid}", dtype=str, header=None)
             
-            # Buscar encabezados inteligentemente
             idx_header = 0
             for i in range(min(15, len(d_raw))):
                 fila_str = " ".join(d_raw.iloc[i].fillna("").astype(str).str.upper())
@@ -146,7 +138,6 @@ def obtener_datos_maestros():
             d_raw.columns = cols
             d = d_raw.iloc[idx_header + 1:].reset_index(drop=True)
 
-            # Diccionario de Renombramiento adaptado a la imagen de SALTA
             renames = {}
             for c in d.columns:
                 c_str = str(c).upper().strip()
@@ -160,7 +151,6 @@ def obtener_datos_maestros():
                 elif 'INGRESO' in c_str: renames[c] = 'FECHA_INGRESO_TALLER'
                 elif 'HORA' in c_str: renames[c] = 'HORA_ENTREGA'
                 elif 'DOMINIO' in c_str or 'PATENTE' in c_str: renames[c] = 'PATENTE'
-                # Logica de MO y REPUESTOS
                 elif 'PRECIO' in c_str and ('MANO' in c_str or 'MO' in c_str): renames[c] = 'PRECIO_MO'
                 elif 'COSTO' in c_str and ('MANO' in c_str or 'MO' in c_str): renames[c] = 'COSTO_MO'
                 elif 'PRECIO' in c_str and 'REPUESTO' in c_str: renames[c] = 'PRECIO_REP'
@@ -193,7 +183,6 @@ def obtener_datos_maestros():
         if not f_fin: f_fin = datetime.now() + timedelta(days=3650) 
         
         mes_hist = f_fin.strftime('%Y-%m') if f_fin.year < 2030 else "SIN FECHA"
-        # Si la columna MES existe, la priorizamos para el historico
         if 'MES' in row and pd.notna(row['MES']):
             mes_str = str(row['MES']).strip().lower()
             for m_name, m_num in MESES_ES.items():
@@ -217,7 +206,6 @@ def obtener_datos_maestros():
         p_rep = limpiar_num(row.get('PRECIO_REP', 0))
         c_rep = limpiar_num(row.get('COSTO_REP', 0))
         
-        # Unificamos Precio y Costo global para que los KPIs de Jujuy sigan funcionando
         precio_total = p_mo + p_rep
         costo_total = c_mo + c_rep
         
@@ -238,8 +226,8 @@ def obtener_datos_maestros():
             'Hora_Entrega': str(row.get('HORA_ENTREGA', '')).replace('nan', '').strip(),
             'Mes_Hist': mes_hist, 'Paños': panos, 'Dias_Reparacion': dias_rep, 'Tipo_ABC': clasificar_abc(panos),
             'Estado_Fac': estado_fac, 'Estado_Taller': estado, 'Fase_Taller': fase, 
-            'Precio': precio_total, 'Costo': costo_total, # Usados por Tablas Generales
-            'Precio_MO': p_mo, 'Costo_MO': c_mo, 'Precio_REP': p_rep, 'Costo_REP': c_rep, # Usados en Facturación
+            'Precio': precio_total, 'Costo': costo_total, 
+            'Precio_MO': p_mo, 'Costo_MO': c_mo, 'Precio_REP': p_rep, 'Costo_REP': c_rep, 
             'Observaciones': str(row.get('OBSERVACIONES_TALLER', '')).replace('nan', '').strip()
         })
     return pd.DataFrame(filas)
@@ -251,6 +239,22 @@ if 'entregas_confirmadas' not in st.session_state: st.session_state.entregas_con
 df = obtener_datos_maestros()
 df_turnos_display = st.session_state.memoria_turnos_v12.copy()
 df_completo = df.copy() 
+
+# ---------------------------------------------------------
+# LECTURA DINÁMICA DE ASESORES Y CLIENTES DESDE EL EXCEL
+# ---------------------------------------------------------
+if not df.empty:
+    # Extrae asesores únicos, saca los vacíos, ordena y pone "SIN ASIGNAR" siempre primero
+    asesores_unicos = [str(a).strip().upper() for a in df['Asesor'].unique() if pd.notna(a) and str(a).strip().upper() != "SIN ASIGNAR"]
+    ASESORES_LISTA = ["SIN ASIGNAR"] + sorted(list(set(asesores_unicos)))
+    
+    # Extrae clientes únicos
+    clientes_unicos = [str(c).strip().upper() for c in df['Cliente'].unique() if pd.notna(c)]
+    CLIENTES_LISTA = sorted(list(set(clientes_unicos)))
+    if "PARTICULAR" not in CLIENTES_LISTA: CLIENTES_LISTA.append("PARTICULAR")
+else:
+    ASESORES_LISTA = ["SIN ASIGNAR"]
+    CLIENTES_LISTA = ["PARTICULAR"]
 
 hoy = datetime.today()
 hoy_ym = hoy.strftime('%Y-%m')
@@ -300,7 +304,7 @@ else:
 
 DIAS_HABILES_MES = dias_habiles_del_mes(año_filtro, mes_num_filtro)
 CAPACIDAD_DIARIA_TALLER = OBJETIVO_MENSUAL_PANOS / DIAS_HABILES_MES
-CAPACIDAD_DIARIA_GRUPO = CAPACIDAD_DIARIA_TALLER # En Salta es 1 solo grupo, la capacidad del grupo es la total
+CAPACIDAD_DIARIA_GRUPO = CAPACIDAD_DIARIA_TALLER 
 dias_restantes_calc = dias_habiles_restantes_mes(año_filtro, mes_num_filtro)
 
 # --- APLICAR BUSCADOR GLOBAL ---
@@ -348,14 +352,13 @@ tab_turnos, tab_prog, tab_portal, tab_fac, tab_kpi, tab_hist = st.tabs([
 ])
 
 # ==========================================
-# PESTAÑA 1: TURNERO Y ENTREGAS (Simplificada visualmente)
+# PESTAÑA 1: TURNERO Y ENTREGAS 
 # ==========================================
 with tab_turnos:
     st.info("💡 **Nota:** La función de ingresos/turnos está disponible pero depende de tener una pestaña 'TURNOS' configurada en el Sheets de Salta.")
     if recomendaciones_grupos and not busqueda_global:
         st.info("**📅 Asistente de Turnos:**\n" + " | ".join([f"**{g}**: libre desde el {f}" for g, f in recomendaciones_grupos.items()]))
     
-    # 2. SALIDAS: Agenda de Entregas (Esto sí funciona con la data maestra)
     with st.container(border=True):
         st.markdown("<h2 style='color: #1e7e34; margin-top: 0;'>📤 Agenda de Entregas</h2>", unsafe_allow_html=True)
         if not df.empty:
@@ -389,7 +392,16 @@ with tab_turnos:
 with tab_prog:
     st.subheader("🛠️ Programación y Flujo de Trabajo")
     if not df.empty:
-        df_en_proceso = df[df['Estado_Taller'].str.contains("PROCESO", na=False)]
+        col_filtro, _ = st.columns([1, 2])
+        # Aca usamos la lista dinámica para el filtro
+        with col_filtro: asesor_filtro_prog = st.selectbox("👔 Filtrar por Asesor", ["TODOS"] + ASESORES_LISTA, key="filtro_asesor_prog")
+            
+        df_prog_filtrado = df.copy()
+        if asesor_filtro_prog != "TODOS":
+            nombre_corto = asesor_filtro_prog.split()[0].upper()
+            df_prog_filtrado = df_prog_filtrado[df_prog_filtrado['Asesor'].str.contains(nombre_corto, case=False, na=False)]
+
+        df_en_proceso = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO", na=False)]
         
         st.markdown(f"### 🚥 Termómetro de Capacidad (Mes de {DIAS_HABILES_MES} días hábiles)")
         if not df_en_proceso.empty:
@@ -414,7 +426,7 @@ with tab_prog:
 
         st.divider()
         st.markdown("### 📋 Tablero Kanban - Taller Salta")
-        df_kanban = df[df['Estado_Taller'].str.contains("PROCESO|DETENIDO", na=False)].copy()
+        df_kanban = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO|DETENIDO", na=False)].copy()
         df_kanban.loc[df_kanban['Estado_Taller'].str.contains("DETENIDO", na=False), 'Fase_Taller'] = "⛔ DETENIDOS"
         
         orden_ideal = ["SIN FASE ASIGNADA", "CHAPA", "PREPARACION", "PINTURA", "ARMADO", "PULIDO", "⛔ DETENIDOS"]
@@ -424,7 +436,6 @@ with tab_prog:
             with cols_kanban[idx]:
                 st.markdown(f"<div class='kanban-col'><h5 style='text-align:center; color:#00235d; margin: 0; font-size: 0.85rem;'>{fase}</h5></div>", unsafe_allow_html=True)
                 
-                # Tolerancia de búsqueda (ej. PREPARACIÓN vs PREPARACION)
                 if fase == "SIN FASE ASIGNADA": df_fase = df_kanban[(df_kanban['Fase_Taller'] == "") | (df_kanban['Fase_Taller'].isna()) | (df_kanban['Fase_Taller'] == "SIN FASE ASIGNADA")]
                 else: df_fase = df_kanban[df_kanban['Fase_Taller'].str.contains(fase[:4], na=False, case=False)]
                 
@@ -461,16 +472,14 @@ with tab_portal:
         else: st.info("No hay vehículos registrados para las empresas del grupo (Autosol/Autolux/Ciel).")
 
 # ==========================================
-# PESTAÑA 4: FACTURACIÓN Y REPUESTOS (ESPECIAL SALTA)
+# PESTAÑA 4: FACTURACIÓN Y REPUESTOS
 # ==========================================
 with tab_fac:
     if not df.empty:
         st.subheader("💰 Análisis de Facturación: Mano de Obra + Repuestos")
         
-        # Filtramos los que están facturados o aprobados para el cálculo (Misma lógica que Jujuy pero con MO y REP)
         df_ventas = df[df['Estado_Fac'].isin(['FAC', 'SI'])].copy()
         
-        # --- TARJETAS SUPERIORES (Estilo Jujuy pero con datos de Salta) ---
         panos_fac = df[df['Estado_Fac'] == 'FAC']['Paños'].sum()
         panos_si = df[df['Estado_Fac'] == 'SI']['Paños'].sum()
         panos_est = panos_fac + panos_si
