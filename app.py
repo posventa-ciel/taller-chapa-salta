@@ -1065,12 +1065,26 @@ with tab_fac:
         df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
         
-        pesos_fac, panos_fac = df_fac['Precio'].sum(), df_fac['Paños'].sum()
-        pesos_si, panos_si = df_si['Precio'].sum(), df_si['Paños'].sum()
-        pesos_est, panos_est = pesos_fac + pesos_si, panos_fac + panos_si
+        # --- CALCULOS DE PLATAS Y PAÑOS ---
+        # FAC
+        mo_fac = df_fac['Precio'].sum()
+        rep_fac = df_fac['Costo'].sum()
+        total_fac = mo_fac + rep_fac
+        panos_fac = df_fac['Paños'].sum()
+        
+        # SI
+        mo_si = df_si['Precio'].sum()
+        rep_si = df_si['Costo'].sum()
+        total_si = mo_si + rep_si
+        panos_si = df_si['Paños'].sum()
+        
+        # PROYECTADO AL CIERRE (FAC + SI)
+        mo_est = mo_fac + mo_si
+        rep_est = rep_fac + rep_si
+        total_est = total_fac + total_si
+        panos_est = panos_fac + panos_si
         
         porcentaje_logro = min((panos_est / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
-        
         dias_restantes = dias_restantes_calc
         panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
@@ -1090,31 +1104,69 @@ with tab_fac:
         st.write("### 2️⃣ Rentabilidad Estimada al Cierre")
         c_r1, c_r2, c_r3 = st.columns(3)
         
-        # FAC: Letras y monto mas grande en verde oscuro
-        c_r1.markdown(f'<div class="metric-card" style="border: 2px solid #28a745; background-color: #f8fff9; min-height: 120px;"><div class="metric-title" style="color: #28a745; font-size: 1.1rem;">Facturado Actual (FAC)</div><div class="metric-value-money" style="color: #28a745; font-size: 2.3rem;">{formato_pesos(pesos_fac)}</div><div class="metric-subtitle-gray" style="font-size: 1.2rem; color: #28a745; font-weight: bold; margin-top: 8px;">📦 {panos_fac:.1f} paños</div></div>', unsafe_allow_html=True)
+        # Tarjeta FAC (Verde oscuro intenso)
+        c_r1.markdown(f'''
+        <div style="border: 2px solid #28a745; border-radius: 8px; padding: 15px; background-color: #f8fff9; text-align: center; height: 100%;">
+            <div style="color: #28a745; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Facturado Actual (FAC)</div>
+            <div style="color: #1e7e34; font-size: 2.2rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_fac)}</div>
+            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
+                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_fac)} <br>
+                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_fac)}
+            </div>
+            <hr style="margin: 10px 0; border-top: 1px solid #d4edda;">
+            <div style="color: #28a745; font-weight: bold; font-size: 1.1rem;">📦 {panos_fac:.1f} paños totales</div>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        # SI: Verde mas clarito (prospecto)
-        c_r2.markdown(f'<div class="metric-card" style="border: 1px solid #75d481; background-color: #f0fdf2; min-height: 120px;"><div class="metric-title" style="color: #5cb85c; font-size: 0.95rem;">Aprobado (SI)</div><div class="metric-value-money" style="color: #6cce75; font-size: 1.8rem;">{formato_pesos(pesos_si)}</div><div class="metric-subtitle-green" style="font-size: 1.1rem; color: #6cce75; margin-top: 8px;">📦 {panos_si:.1f} paños</div></div>', unsafe_allow_html=True)
+        # Tarjeta SI (Verde clarito prospecto)
+        c_r2.markdown(f'''
+        <div style="border: 2px solid #6cce75; border-radius: 8px; padding: 15px; background-color: #f0fdf2; text-align: center; height: 100%;">
+            <div style="color: #5cb85c; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Aprobado (SI)</div>
+            <div style="color: #5cb85c; font-size: 1.8rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_si)}</div>
+            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
+                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_si)} <br>
+                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_si)}
+            </div>
+            <hr style="margin: 10px 0; border-top: 1px solid #dff0d8;">
+            <div style="color: #5cb85c; font-weight: bold; font-size: 1.1rem;">📦 {panos_si:.1f} paños totales</div>
+        </div>
+        ''', unsafe_allow_html=True)
         
-        # PROYECCIÓN: Azul corporativo
-        c_r3.markdown(f'<div class="metric-card" style="border: 2px solid #00235d; background-color: #f8f9fa; min-height: 120px;"><div class="metric-title" style="color:#00235d; font-size: 1.1rem;">Estimado a Cierre de Mes</div><div class="metric-value-money" style="color:#00235d; font-size: 2rem;">{formato_pesos(pesos_est)}</div><div class="metric-subtitle-gray" style="font-size: 1.2rem; color:#00235d; font-weight: bold; margin-top: 8px;">📦 {panos_est:.1f} paños totales</div></div>', unsafe_allow_html=True)
+        # Tarjeta Total (Azul corporativo)
+        c_r3.markdown(f'''
+        <div style="border: 2px solid #00235d; border-radius: 8px; padding: 15px; background-color: #f8f9fa; text-align: center; height: 100%;">
+            <div style="color: #00235d; font-size: 1.1rem; font-weight: bold; text-transform: uppercase; margin-bottom: 5px;">Estimado al Cierre (FAC+SI)</div>
+            <div style="color: #00235d; font-size: 2.2rem; font-weight: bold; margin-bottom: 10px;">{formato_pesos(total_est)}</div>
+            <div style="color: #555; font-size: 0.95rem; line-height: 1.4;">
+                <span style="color:#00235d; font-weight:600;">M.O.:</span> {formato_pesos(mo_est)} <br>
+                <span style="color:#dc3545; font-weight:600;">Repuestos:</span> {formato_pesos(rep_est)}
+            </div>
+            <hr style="margin: 10px 0; border-top: 1px solid #dee2e6;">
+            <div style="color: #00235d; font-weight: bold; font-size: 1.1rem;">📦 {panos_est:.1f} paños totales</div>
+        </div>
+        ''', unsafe_allow_html=True)
         
         st.markdown("<br>", unsafe_allow_html=True)
         
+        with st.expander("🔍 Ver Detalle de Vehículos Aprobados (SI)"):
+            if not df_si.empty:
+                st.dataframe(df_si[['Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Precio', 'Costo', 'Paños', 'Estado_Taller']].sort_values('Precio', ascending=False), hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
+            else:
+                st.info("No hay vehículos en estado SI en este momento.")
+
         # --- 3. Detalle de Estados Pendientes ---
         df_tpf = df[df['Estado_Taller'].str.contains("TERM PEND FACT", na=False)]
         df_tpe = df[df['Estado_Taller'].str.contains("TERM PEND ENTREG", na=False)]
         df_epf = df[df['Estado_Taller'].str.contains("ENTREGADO PEND FACT", na=False)]
         
-        # Calculamos la plata inmovilizada en repuestos (usando la columna Costo)
         costo_pend_repuestos = df_tpf['Costo'].sum() + df_tpe['Costo'].sum() + df_epf['Costo'].sum()
 
-        st.write("### 3️⃣ Detalle de Estados Pendientes (Plata Inmovilizada MO y Repuestos)")
+        st.write("### 3️⃣ Detalle de Estados Pendientes (Plata Inmovilizada)")
         c_e1, c_e2, c_e3, c_e4 = st.columns(4)
-        c_e1.markdown(f'<div class="metric-card"><div class="metric-title">Terminado Pend. Facturar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpf["Precio"].sum())}</div><div class="metric-subtitle-red">⚠️ {df_tpf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e2.markdown(f'<div class="metric-card"><div class="metric-title">Terminado Pend. Entregar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpe["Precio"].sum())}</div><div class="metric-subtitle-blue">⏳ {df_tpe["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e3.markdown(f'<div class="metric-card"><div class="metric-title">Entregado Pend. Facturar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_epf["Precio"].sum())}</div><div class="metric-subtitle-green">🚚 {df_epf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e4.markdown(f'<div class="metric-card" style="background-color: #fff3cd;"><div class="metric-title" style="color: #856404;">Repuestos Pend. (Estimado)</div><div class="metric-value-money" style="font-size: 1.4rem; color: #856404;">{formato_pesos(costo_pend_repuestos)}</div><div class="metric-subtitle-gray" style="color: #856404;">⚙️ Costo en autos ptes.</div></div>', unsafe_allow_html=True)
+        c_e1.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Facturar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpf["Precio"].sum())}</div><div class="metric-subtitle-red">⚠️ {df_tpf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e2.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Entregar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpe["Precio"].sum())}</div><div class="metric-subtitle-blue">⏳ {df_tpe["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e3.markdown(f'<div class="metric-card"><div class="metric-title">Entreg. Pend. Facturar (M.O.)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_epf["Precio"].sum())}</div><div class="metric-subtitle-green">🚚 {df_epf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e4.markdown(f'<div class="metric-card" style="background-color: #fff3cd; border: 1px solid #ffeeba;"><div class="metric-title" style="color: #856404;">Repuestos Pendientes</div><div class="metric-value-money" style="font-size: 1.4rem; color: #856404;">{formato_pesos(costo_pend_repuestos)}</div><div class="metric-subtitle-gray" style="color: #856404;">⚙️ En autos sin facturar</div></div>', unsafe_allow_html=True)
         
         # --- 4. Curva de Producción ---
         if mes_filtro != "TODOS":
@@ -1163,12 +1215,21 @@ with tab_fac:
         t_ase, t_emp, t_rep = st.tabs(["👔 Por Asesor", "🏢 Por Empresa", "⚙️ Repuestos"])
         with t_ase:
             df_ase = df_analisis.groupby('Asesor').agg(Autos=('Patente','count'), Paños=('Paños','sum'), Facturación=('Precio','sum')).reset_index().sort_values('Facturación', ascending=False)
-            st.dataframe(df_ase, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Facturación ($)", format="$ %d")})
+            c_graf1, c_tab1 = st.columns([3, 2])
+            with c_graf1:
+                fig_ase = px.bar(df_ase, x='Asesor', y='Facturación', text_auto='$.3s', title='Facturación de Mano de Obra por Asesor', color_discrete_sequence=['#17a2b8'])
+                st.plotly_chart(fig_ase, use_container_width=True)
+            with c_tab1:
+                st.dataframe(df_ase, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Fact. ($)", format="$ %d")})
         with t_emp:
             df_emp = df_analisis.groupby('Cliente').agg(Autos=('Patente','count'), Paños=('Paños','sum'), Facturación=('Precio','sum')).reset_index().sort_values('Facturación', ascending=False)
-            st.dataframe(df_emp, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Facturación ($)", format="$ %d")})
+            c_graf2, c_tab2 = st.columns([3, 2])
+            with c_graf2:
+                fig_emp = px.bar(df_emp, x='Cliente', y='Facturación', text_auto='$.3s', title='Facturación de Mano de Obra por Empresa', color_discrete_sequence=['#6f42c1'])
+                st.plotly_chart(fig_emp, use_container_width=True)
+            with c_tab2:
+                st.dataframe(df_emp, hide_index=True, use_container_width=True, column_config={"Facturación": st.column_config.NumberColumn("Fact. ($)", format="$ %d")})
         with t_rep:
-            # Filtramos los que tienen costo > 0 para mostrar los repuestos
             df_rep = df_analisis[df_analisis['Costo'] > 0][['Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Costo', 'Estado_Taller']].sort_values('Costo', ascending=False)
             if not df_rep.empty:
                 st.dataframe(df_rep, hide_index=True, use_container_width=True, column_config={"Costo": st.column_config.NumberColumn("Costo / Repuestos ($)", format="$ %d")})
