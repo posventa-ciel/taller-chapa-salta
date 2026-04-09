@@ -1083,9 +1083,13 @@ with tab_fac:
             
         df_analisis['Estado_Resumen'] = df_analisis.apply(clasificar_estado, axis=1)
 
-        # ⚠️ EL ARREGLO CLAVE: Filtramos los datos POR MES ANTES de sumar la plata.
-        # Usamos la Fecha Promesa (o la Fecha Taller si existe) para definir a qué mes pertenece.
-        df_analisis['Fecha_Para_Mes'] = pd.to_datetime(df_analisis['Fecha_Taller'].fillna(df_analisis['Fecha_Promesa_Disp']), errors='coerce')
+        # 🛡️ SOLUCIÓN ANTI-CRASH: Chequeamos si la columna existe antes de pedirla
+        if 'Fecha_Taller' in df_analisis.columns:
+            fechas_base = df_analisis['Fecha_Taller'].fillna(df_analisis['Fecha_Promesa_Disp'])
+        else:
+            fechas_base = df_analisis['Fecha_Promesa_Disp']
+            
+        df_analisis['Fecha_Para_Mes'] = pd.to_datetime(fechas_base, errors='coerce')
         
         if mes_filtro != "TODOS":
             df_analisis = df_analisis[df_analisis['Fecha_Para_Mes'].dt.month == mes_num_filtro]
