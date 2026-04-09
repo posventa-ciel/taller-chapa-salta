@@ -140,15 +140,15 @@ def obtener_turnos():
         d = pd.read_csv(f"{URL_BASE}{GID_TURNOS}", dtype=str)
         d.columns = d.columns.str.strip().str.upper()
         
-        # 1. Búsqueda radar de la columna Patente (esencial para que funcione)
+        # 1. Búsqueda radar de la columna Patente
         col_patente = next((c for c in d.columns if 'PATENTE' in c or 'DOMINIO' in c), None)
         if col_patente:
             d = d.dropna(subset=[col_patente])
             d = d[d[col_patente].str.strip() != ""]
         else:
-            return pd.DataFrame(columns=columnas_base) # Si no hay patente, corta acá
+            return pd.DataFrame(columns=columnas_base) 
 
-        # 2. Búsqueda radar del resto de las columnas sin importar dónde estén
+        # 2. Búsqueda radar del resto de las columnas
         col_recibido = next((c for c in d.columns if 'RECIBID' in c), None)
         col_fotos = next((c for c in d.columns if 'FOTO' in c), None)
         col_turno = next((c for c in d.columns if 'TURNO' in c and 'HORA' not in c), 'TURNO')
@@ -205,7 +205,10 @@ def obtener_turnos():
                 'Ticket': val_ticket, 'Referencia': val_referencia, 'Recibido': bool_recibido, 'Fotos': bool_fotos, 
                 'Cancelado': es_cancelado, 'Motivo_Cancelacion': val_motivo_str, 'Eliminar': False
             })
-        return pd.DataFrame(filas)
+            
+        # SOLUCIÓN: Forzamos las columnas incluso si 'filas' está vacía
+        return pd.DataFrame(filas, columns=columnas_base)
+        
     except Exception as e: 
         print(f"Error cargando turnos: {e}")
         return pd.DataFrame(columns=columnas_base)
@@ -322,7 +325,7 @@ def obtener_datos_maestros():
     return pd.DataFrame(filas)
 
 # --- MEMORIA Y CARGA DE DATOS ---
-if 'memoria_turnos_v12' not in st.session_state: 
+if 'memoria_turnos_v13' not in st.session_state: 
     st.session_state.memoria_turnos_v12 = obtener_turnos()
 
 if 'entregas_confirmadas' not in st.session_state:
