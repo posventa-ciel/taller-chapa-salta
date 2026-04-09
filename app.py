@@ -1410,31 +1410,6 @@ with tab_fac:
             st.dataframe(df_alertas, hide_index=True, use_container_width=True)
         else:
             st.success("✅ ¡Planilla impecable! No se detectaron errores de carga de datos críticos.")
-            
-        # --- TABLA HISTÓRICA ---
-        st.divider()
-        st.markdown("### 📅 Facturación Histórica Mensual")
-        
-        if not df_completo.empty:
-            df_hist = df_completo.copy()
-            df_hist['Cliente_Hist'] = df_hist['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas')
-            
-            if 'Mes_Hist' in df_hist.columns and not df_hist['Mes_Hist'].empty:
-                pivot_panos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Paños', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
-                
-                if not pivot_panos.empty:
-                    st.write("**Paños Facturados Histórico**")
-                    pivot_panos['Total'] = pivot_panos.sum(axis=1)
-                    pivot_panos = pivot_panos.sort_index(ascending=False)
-                    st.dataframe(pivot_panos.style.format("{:.1f}").map(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#00235d', 'color': 'white'}, subset=['Total']).map(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
-                    
-                    df_hist['Total_Pesos'] = df_hist['Precio'] + df_hist['Costo']
-                    pivot_pesos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Total_Pesos', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
-                    
-                    st.write("**Pesos Totales (M.O. + Repuestos) Facturados Histórico**")
-                    pivot_pesos['Total'] = pivot_pesos.sum(axis=1)
-                    pivot_pesos = pivot_pesos.sort_index(ascending=False)
-                    st.dataframe(pivot_pesos.style.format(formato_pesos).map(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#28a745', 'color': 'white'}, subset=['Total']).map(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
 
 # ==========================================
 # PESTAÑA 5: KPIs
