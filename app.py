@@ -952,11 +952,28 @@ with tab_prog:
 
         st.divider()
 
+        # --- ANÁLISIS DE CARGA TOYOTA (ABC) REUBICADO ---
+        st.markdown("### 📊 Análisis de Carga por Método Toyota (ABC)")
+        df_abc = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO|DETENIDO", na=False)]
+        if not df_abc.empty:
+            abc_stats = df_abc.groupby('Tipo_ABC').agg(Autos=('Patente', 'count'), Paños=('Paños', 'sum')).reset_index()
+            
+            c_abc1, c_abc2 = st.columns([2, 3])
+            with c_abc1:
+                st.dataframe(abc_stats, hide_index=True, use_container_width=True, column_config={"Tipo_ABC": "Categoría", "Autos": "Cant. Autos", "Paños": "Total Paños"})
+                st.caption("💡 **Regla ABC:** A (1-3 paños), B (4-7 paños), C (8+ paños). Lo ideal es mantener un flujo mayoritario de A y B para evitar cuellos de botella.")
+            with c_abc2:
+                fig_abc = px.pie(abc_stats, names='Tipo_ABC', values='Autos', title="Distribución de Vehículos Activos", color='Tipo_ABC', color_discrete_map={'A (1-3 paños)':'#28a745', 'B (4-7 paños)':'#ffc107', 'C (8+ paños)':'#dc3545'}, hole=0.4)
+                st.plotly_chart(fig_abc, use_container_width=True)
+        else:
+            st.info("No hay vehículos activos para el análisis ABC.")
+
+        st.divider()
+
         st.markdown("### 📋 Tablero Kanban - Taller Salta")
         df_kanban = df_prog_filtrado[df_prog_filtrado['Estado_Taller'].str.contains("PROCESO|DETENIDO", na=False)].copy()
         df_kanban.loc[df_kanban['Estado_Taller'].str.contains("DETENIDO", na=False), 'Fase_Taller'] = "⛔ DETENIDOS"
         
-        # ACA ESTA CORREGIDO: SE SACO PULIDO DE LA LISTA
         orden_ideal = ["SIN FASE ASIGNADA", "CHAPA", "PREPARACION", "PINTURA", "ARMADO", "⛔ DETENIDOS"]
         
         cols_kanban = st.columns(len(orden_ideal))
@@ -987,6 +1004,7 @@ with tab_prog:
                             {novedad_html}
                         </div>
                         """, unsafe_allow_html=True)
+                        
 # ==========================================
 # PESTAÑA 3: PORTAL EMPRESAS 
 # ==========================================
