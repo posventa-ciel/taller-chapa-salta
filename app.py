@@ -987,7 +987,7 @@ with tab_prog:
         df_kanban['Fase_Taller'] = df_kanban['Fase_Taller'].str.strip().str.upper()
         df_kanban['Fase_Taller'] = df_kanban['Fase_Taller'].replace({"PREPARACION": "PREPARACIÓN"})
         
-        orden_ideal = ["SIN FASE ASIGNADA", "CHAPA", "PREPARACIÓN", "PINTURA", "ARMADO", "PULIDO", "⛔ DETENIDOS"]
+        orden_ideal = ["SIN FASE ASIGNADA", "CHAPA", "PREPARACION", "PINTURA", "ARMADO", "⛔ DETENIDOS"]
         
         grupos_presentes = ["GRUPO", "PULIDOS"]
 
