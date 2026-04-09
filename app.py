@@ -1071,7 +1071,7 @@ with tab_fac:
         st.markdown("## 💰 Análisis de Facturación y Objetivos")
         st.markdown(f"<p style='color: gray; font-size: 1em;'>Período de Análisis: <strong>{mes_seleccionado_label}</strong> | Objetivo Mensual: <strong>{OBJETIVO_MENSUAL_PANOS} Paños</strong></p>", unsafe_allow_html=True)
         
-        # --- PREPARACIÓN DE DATOS (Salta) ---
+        # --- PREPARACIÓN DE DATOS ---
         df_analisis = df.copy()
         def clasificar_estado(row):
             est_taller = str(row['Estado_Taller']).upper()
@@ -1111,11 +1111,11 @@ with tab_fac:
         panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - proy_panos)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
 
-        # --- SECCIÓN 1: KEY METRICS (Mimic Jujuy - Salta Style sin fondo verde) ---
+        # --- SECCIÓN 1: KEY METRICS ---
         st.markdown("<br>", unsafe_allow_html=True)
         c_kpi1, c_kpi2, c_kpi3 = st.columns(3)
         
-        # Tarjeta FAC (Verde oscuro Salta)
+        # Tarjeta FAC 
         c_kpi1.markdown(f'''
         <div class="metric-card" style="border-left: 6px solid #1e7e34; background-color: white;">
             <div class="metric-title" style="color: #1e7e34;">Facturado Actual (FAC)</div>
@@ -1131,7 +1131,7 @@ with tab_fac:
         </div>
         ''', unsafe_allow_html=True)
         
-        # Tarjeta SI (Cian/Azul clarito Jujuy - Salta Style sin fondo verde)
+        # Tarjeta SI 
         c_kpi2.markdown(f'''
         <div class="metric-card" style="border-left: 6px solid #17a2b8; background-color: white;">
             <div class="metric-title" style="color: #17a2b8;">Aprobado (SI)</div>
@@ -1147,7 +1147,7 @@ with tab_fac:
         </div>
         ''', unsafe_allow_html=True)
         
-        # Tarjeta PROYECCIÓN (Azul corporativo)
+        # Tarjeta PROYECCIÓN 
         c_kpi3.markdown(f'''
         <div class="metric-card" style="border-left: 6px solid #00235d; background-color: white;">
             <div class="metric-title" style="color: #00235d;">Estimado a Cierre de Mes (FAC+SI)</div>
@@ -1163,7 +1163,7 @@ with tab_fac:
         </div>
         ''', unsafe_allow_html=True)
 
-        # --- OBJETIVO Y RITMO (Mimic Jujuy) ---
+        # --- OBJETIVO Y RITMO ---
         c_obj1, c_obj2 = st.columns([3, 1])
         with c_obj1:
             st.markdown(f"<p style='margin-bottom: 5px;'><strong>Progreso hacia el Objetivo:</strong> {proy_panos:.1f} de {OBJETIVO_MENSUAL_PANOS} Paños ({porcentaje_logro:.1f}%)</p>", unsafe_allow_html=True)
@@ -1181,16 +1181,19 @@ with tab_fac:
         
         st.divider()
 
-        # --- SECCIÓN 2: GRÁFICOS GRANDES (Plotly - Mimic Jujuy sin grupos) ---
+        # --- SECCIÓN 2: GRÁFICOS GRANDES ---
         
         # A. Curva de Producción (Gantt)
         st.markdown("### 🗓️ Curva de Producción y Facturación")
+        st.caption("Nota: Solo se grafican vehículos con Fechas de Promesa válidas.")
         
         if mes_filtro != "TODOS":
             df_gantt = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
             df_gantt = df_gantt.dropna(subset=['Fecha_Promesa_Disp'])
             
-            # Gráfico Gantt de Jujuy modificado sin grupos
+            # FILTRO CRÍTICO: Excluimos las fechas del año 2035 que son autos sin fecha
+            df_gantt = df_gantt[df_gantt['Fecha_Promesa_Disp'].apply(lambda x: x.year < 2030)]
+            
             if not df_gantt.empty:
                 df_gantt['Vehiculo_Label'] = df_gantt['Vehiculo'].str[:12] + " (" + df_gantt['Asesor'] + ")"
                 df_gantt = df_gantt.sort_values(by=['Fecha_Promesa_Disp', 'Hora_Entrega'])
@@ -1204,96 +1207,99 @@ with tab_fac:
                                       color_discrete_map={'Facturado (FAC)':'#1e7e34', 'Aprobado (SI)':'#17a2b8'},
                                       labels={"Vehiculo_Label": "Unidad (Asesor)", "Estado_Resumen": "Estado Fac."})
                 
+                # Ajuste de altura dinámico según la cantidad de autos y orden invertido para que se lea mejor
+                altura_gantt = max(350, 40 * len(df_gantt))
                 fig_gantt.update_layout(xaxis_title="Fecha de Entrega", 
                                         yaxis_title=None,
-                                        height=min(600, 100 + 20 * len(df_gantt)),
+                                        height=altura_gantt,
                                         legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
                 
-                fig_gantt.update_yaxes(categoryorder="total ascending")
+                fig_gantt.update_yaxes(autorange="reversed")
                 fig_gantt.update_traces(textposition='inside', insidetextanchor='middle', opacity=0.85)
                 
                 st.plotly_chart(fig_gantt, use_container_width=True)
             else:
-                st.info("No hay vehículos FAC/SI con fecha de entrega para armar la curva.")
+                st.info("No hay vehículos FAC/SI con fechas válidas en el mes seleccionado para armar la curva.")
         
-        # B. Gráficos de Barra (Stacked Bars - Mimic Jujuy apilando por Cliente/Particular)
+        # B. Gráficos de Barra horizontales
         st.markdown("### 📈 Análisis de Producción Detallado")
         
         c_graf1, c_graf2 = st.columns(2)
         
         with c_graf1:
-            # Gráfico de Paños por Asesor (Stack Particular vs Empresas)
             st.markdown("<p style='text-align: center; font-weight: bold;'>Producción Paños por Asesor (FAC+SI)</p>", unsafe_allow_html=True)
             df_bar_paños = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
             
-            # Simplificamos clientes como Jujuy (Particular vs Empresas)
+            # Limpiamos datos vacíos para que no quede feo
+            df_bar_paños = df_bar_paños[df_bar_paños['Asesor'].str.strip() != ""]
+            df_bar_paños = df_bar_paños[~df_bar_paños['Asesor'].str.contains("NAN|SIN ASIGNAR", na=False)]
             df_bar_paños['stackParticular'] = df_bar_paños['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas')
             
-            # Gráfico de Jujuy modificado
-            fig_paños_ase = px.bar(df_bar_paños, 
-                                  x="Asesor", 
-                                  y="Paños", 
+            # Agrupamos para Plotly
+            df_group_panos = df_bar_paños.groupby(['Asesor', 'stackParticular'])['Paños'].sum().reset_index()
+            df_group_panos = df_group_panos.sort_values(by='Paños', ascending=True)
+
+            fig_paños_ase = px.bar(df_group_panos, 
+                                  y="Asesor", 
+                                  x="Paños", 
                                   color="stackParticular",
+                                  orientation='h',
                                   title=None,
                                   labels={"stackParticular": "Cliente"},
                                   text_auto='.1f',
                                   color_discrete_map={'Particular':'#6c757d', 'Empresas':'#00235d'})
             
-            fig_paños_ase.update_layout(xaxis_title=None, 
-                                        yaxis_title="Cantidad Paños",
-                                        height=400,
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig_paños_ase.update_layout(xaxis_title="Cantidad Paños", yaxis_title=None, height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_paños_ase, use_container_width=True)
             
         with c_graf2:
-            # Gráfico de Pesos por Asesor (Stack Particular vs Empresas)
             st.markdown("<p style='text-align: center; font-weight: bold;'>Facturación Pesos (M.O.) por Asesor (FAC+SI)</p>", unsafe_allow_html=True)
             df_bar_pesos = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+            
+            df_bar_pesos = df_bar_pesos[df_bar_pesos['Asesor'].str.strip() != ""]
+            df_bar_pesos = df_bar_pesos[~df_bar_pesos['Asesor'].str.contains("NAN|SIN ASIGNAR", na=False)]
             df_bar_pesos['stackParticular'] = df_bar_pesos['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas')
 
-            # Gráfico de Jujuy modificado
-            fig_pesos_ase = px.bar(df_bar_pesos, 
-                                  x="Asesor", 
-                                  y="Precio", 
+            df_group_pesos = df_bar_pesos.groupby(['Asesor', 'stackParticular'])['Precio'].sum().reset_index()
+            df_group_pesos = df_group_pesos.sort_values(by='Precio', ascending=True)
+
+            fig_pesos_ase = px.bar(df_group_pesos, 
+                                  y="Asesor", 
+                                  x="Precio", 
                                   color="stackParticular",
+                                  orientation='h',
                                   title=None,
                                   labels={"stackParticular": "Cliente"},
-                                  text_auto='$.2s', # Formato Jujuy k/M
-                                  color_discrete_map={'Particular':'#6c757d', 'Empresas':'#1e7e34'}) # Verde oscuro para pesos empresas
+                                  text_auto='$.2s',
+                                  color_discrete_map={'Particular':'#6c757d', 'Empresas':'#1e7e34'}) 
             
-            fig_pesos_ase.update_layout(xaxis_title=None, 
-                                        yaxis_title="Pesos M.O. ($)",
-                                        height=400,
-                                        legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig_pesos_ase.update_layout(xaxis_title="Pesos M.O. ($)", yaxis_title=None, height=400, legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig_pesos_ase, use_container_width=True)
         
         st.divider()
 
-        # --- SECCIÓN 3: DETALLES EXPANSIBLES (Salta Style) ---
+        # --- SECCIÓN 3: DETALLES EXPANSIBLES ---
         st.markdown("### 📑 Listados Detallados")
         
-        # A. Detalle FAC
         with st.expander("Ver Detalle Facturado Actual (FAC)", expanded=False):
             if not df_fac.empty:
-                # Columnas de Jujuy
-                df_fac_disp = df_fac[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Seguro', 'Precio', 'Costo', 'Paños']].sort_values(by='Precio', ascending=False)
+                # SE ELIMINÓ LA PALABRA "SEGURO" DEL FILTRO PARA EVITAR EL ERROR
+                df_fac_disp = df_fac[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Precio', 'Costo', 'Paños']].sort_values(by='Precio', ascending=False)
                 st.dataframe(df_fac_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
             else:
                 st.info("No hay vehículos facturados en el período.")
         
-        # B. Detalle SI
         with st.expander("Ver Detalle Aprobado (SI)", expanded=False):
             if not df_si.empty:
-                df_si_disp = df_si[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Seguro', 'Precio', 'Costo', 'Paños', 'Estado_Taller']].sort_values(by='Precio', ascending=False)
+                # SE ELIMINÓ LA PALABRA "SEGURO" DEL FILTRO PARA EVITAR EL ERROR
+                df_si_disp = df_si[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Precio', 'Costo', 'Paños', 'Estado_Taller']].sort_values(by='Precio', ascending=False)
                 st.dataframe(df_si_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
             else:
                 st.info("No hay vehículos aprobados (SI) en el período.")
         
-        # C. Plata en Taller (Inmovilizada - Mimic Jujuy simple)
         with st.expander("Ver Plata en Taller (Inmovilizada)", expanded=False):
             df_taller = df_analisis[~df_analisis['Estado_Resumen'].isin(['Facturado (FAC)'])].copy()
             if not df_taller.empty:
-                # Calculamos inmovilizado
                 st.write(f"Vehículos en Taller/Aprobados (No Facturados): **{len(df_taller)} Unidades** | M.O.: **{formato_pesos(df_taller['Precio'].sum())}** | Repuestos: **{formato_pesos(df_taller['Costo'].sum())}**")
                 df_taller_disp = df_taller[['Patente', 'Vehiculo', 'Asesor', 'Cliente', 'Estado_Taller', 'Paños', 'Precio', 'Costo', 'Fecha_Promesa_Disp']].sort_values(by='Fecha_Promesa_Disp')
                 st.dataframe(df_taller_disp, hide_index=True, use_container_width=True, column_config={"Precio": st.column_config.NumberColumn("M.O. ($)", format="$ %d"), "Costo": st.column_config.NumberColumn("Repuestos ($)", format="$ %d")})
@@ -1302,33 +1308,28 @@ with tab_fac:
 
         st.divider()
 
-        # --- SECCIÓN 4: HISTÓRICO (Jujuy Histórico Table - Salta Groups SOL/LUX/CIEL) ---
+        # --- SECCIÓN 4: HISTÓRICO ---
         st.markdown("### 📅 Facturación Histórica Mensual")
         
         if not df_completo.empty:
             df_hist = df_completo.copy()
-            # Mantenemos grupos de Salta (SOL/LUX/CIEL/Particular) para el histórico como Jujuy
             df_hist['Cliente_Hist'] = df_hist['Cliente'].apply(lambda c: 'Particular' if c == 'PARTICULAR' else 'Empresas SOL/LUX/CIEL')
             
             if 'Mes_Hist' in df_hist.columns and not df_hist['Mes_Hist'].empty:
-                # Pivot de Paños
                 pivot_panos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Paños', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
                 
                 if not pivot_panos.empty:
                     st.write("**Paños Facturados Histórico**")
                     pivot_panos['Total'] = pivot_panos.sum(axis=1)
                     pivot_panos = pivot_panos.sort_index(ascending=False)
-                    
                     st.dataframe(pivot_panos.style.format("{:.1f}").applymap(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#00235d', 'color': 'white'}, subset=['Total']).applymap(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
                     
-                    # Pivot de Pesos (Total Mo + Rep)
                     df_hist['Total_Pesos'] = df_hist['Precio'] + df_hist['Costo']
                     pivot_pesos = pd.pivot_table(df_hist[df_hist['Estado_Fac'] == 'FAC'], values='Total_Pesos', index='Mes_Hist', columns='Cliente_Hist', aggfunc='sum', fill_value=0)
                     
-                    st.write("**Pesos Totales ($) Facturados Histórico**")
+                    st.write("**Pesos Totales (M.O. + Repuestos) Facturados Histórico**")
                     pivot_pesos['Total'] = pivot_pesos.sum(axis=1)
                     pivot_pesos = pivot_pesos.sort_index(ascending=False)
-                    
                     st.dataframe(pivot_pesos.style.format(formato_pesos).applymap(lambda x: 'color: transparent' if x == 0 else '').set_properties(**{'background-color': '#1e7e34', 'color': 'white'}, subset=['Total']).applymap(lambda x: 'font-weight: bold', subset=['Total']), use_container_width=True)
                 else:
                     st.info("No hay datos históricos facturados suficientes.")
