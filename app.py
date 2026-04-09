@@ -1283,7 +1283,9 @@ with tab_fac:
                                  title="Saturación por Día de la Semana",
                                  color_discrete_map={'📥 Recepciones': '#00235d', '📤 Entregas': '#28a745'}, text_auto=True)
                 fig_sem.update_layout(xaxis_title="", yaxis_title="Cant. de Vehículos", legend_title_text="")
-                st.plotly_chart(fig_sem, use_container_width=True)
+                
+                # ACÁ LE AGREGAMOS LA KEY ÚNICA
+                st.plotly_chart(fig_sem, use_container_width=True, key="grafico_saturacion_semana_salta")
 
             with c_bal2:
                 entregas_diarias = df_balance.dropna(subset=['Fecha_Promesa_Dt']).groupby('Fecha_Promesa_Dt').size().reset_index(name='Cantidad')
@@ -1298,7 +1300,8 @@ with tab_fac:
                     promedio_entregas = entregas_diarias['Cantidad'].mean()
                     fig_dia.add_hline(y=promedio_entregas, line_dash="dash", line_color="#dc3545", annotation_text=f"Promedio Ideal: {promedio_entregas:.1f}/día", annotation_position="top left")
                     
-                st.plotly_chart(fig_dia, use_container_width=True)
+                # ACÁ TAMBIÉN LE AGREGAMOS LA KEY ÚNICA
+                st.plotly_chart(fig_dia, use_container_width=True, key="grafico_calendario_entregas_salta")
 
         st.divider()
 
