@@ -1090,8 +1090,8 @@ with tab_fac:
         fac_mo, fac_rep = df_fac['Precio'].sum(), df_fac['Costo'].sum()
         si_mo, si_rep = df_si['Precio'].sum(), df_si['Costo'].sum()
 
-        pesos_fac = fac_mo + fac_rep
-        pesos_si = si_mo + si_rep
+        pesos_fac = fac_mo
+        pesos_si = si_mo
         pesos_est = pesos_fac + pesos_si
 
         panos_fac = df_fac['Paños'].sum()
