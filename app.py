@@ -39,33 +39,17 @@ if hoja is not None:
 else:
     df = pd.DataFrame()
 
-# 2. Convertimos la pestaña REPUESTOS a la variable 'df_repuestos'
+# 2. Convertimos la pestaña REPUESTOS a la variable 'df_repuestos' (¡VERSIÓN ANTI-COLUMNAS VACÍAS!)
 if hoja_repuestos is not None:
     try:
-        df_repuestos = pd.DataFrame(hoja_repuestos.get_all_records())
+        datos_repuestos = hoja_repuestos.get_all_values()
+        if datos_repuestos:
+            # Separamos la primera fila (títulos) del resto de los datos
+            df_repuestos = pd.DataFrame(datos_repuestos[1:], columns=datos_repuestos[0])
+        else:
+            df_repuestos = pd.DataFrame()
     except Exception as e:
         st.warning(f"Error al convertir los datos de REPUESTOS: {e}")
-        df_repuestos = pd.DataFrame()
-else:
-    df_repuestos = pd.DataFrame()
-
-# --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
-if hoja_repuestos is not None:
-    try:
-        df_repuestos = pd.DataFrame(hoja_repuestos.get_all_records())
-    except Exception as e:
-        st.warning(f"Error al convertir los datos de REPUESTOS: {e}")
-        df_repuestos = pd.DataFrame()
-else:
-    df_repuestos = pd.DataFrame()
-
-# --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
-# Acá aseguramos que exista df_repuestos para que la Pestaña 4 no tire error
-if hoja_repuestos is not None:
-    try:
-        df_repuestos = pd.DataFrame(hoja_repuestos.get_all_records())
-    except Exception as e:
-        st.warning("No se pudieron leer los datos de la pestaña REPUESTOS.")
         df_repuestos = pd.DataFrame()
 else:
     df_repuestos = pd.DataFrame()
