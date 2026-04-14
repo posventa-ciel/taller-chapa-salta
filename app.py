@@ -1104,9 +1104,39 @@ with tab_fac:
         df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
 
-        # --- CÁLCULOS SEPARADOS (MO Y REPUESTOS SALTA) ---
-        fac_mo, fac_rep = df_fac['Precio'].sum(), df_fac['Costo'].sum()
-        si_mo, si_rep = df_si['Precio'].sum(), df_si['Costo'].sum()
+        # --- CÁLCULOS DE MANO DE OBRA (Desde la pestaña principal) ---
+        fac_mo = df_fac['Precio'].sum()
+        si_mo = df_si['Precio'].sum()
+
+        # --- CÁLCULOS DE REPUESTOS (Desde la pestaña 'df_repuestos') ---
+        try:
+            df_rep = df_repuestos.copy()
+            
+            # Limpiador mágico: saca signos $, espacios, y arregla puntos/comas
+            def limpiar_plata(x):
+                if isinstance(x, (int, float)): return float(x)
+                x = str(x).replace('$', '').replace(' ', '').replace('.', '') # saco miles
+                x = x.replace(',', '.') # paso coma decimal a punto
+                try: return float(x)
+                except: return 0.0
+                
+            df_rep['Monto Fac'] = df_rep['Monto Fac'].apply(limpiar_plata)
+
+            # Filtramos los repuestos por el mes seleccionado en la app
+            if mes_filtro != "TODOS":
+                # Asumo que mes_filtro es texto (ej. "ABRIL") y la columna Mes Fac también
+                df_rep = df_rep[df_rep['Mes Fac'].astype(str).str.strip().str.upper() == str(mes_filtro).upper()]
+
+            # Sumamos la columna 'Monto Fac' filtrando por la columna 'Estado' (FAC o SI)
+            fac_rep = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper() == 'FAC']['Monto Fac'].sum()
+            si_rep = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper() == 'SI']['Monto Fac'].sum()
+            
+        except NameError:
+            st.error("⚠️ Todavía no creaste la variable 'df_repuestos' leyendo el Google Sheets.")
+            fac_rep, si_rep = 0, 0
+        except KeyError:
+            st.error("⚠️ Verifica los nombres de las columnas en la pestaña REPUESTOS (Deben ser 'Monto Fac', 'Estado' y 'Mes Fac').")
+            fac_rep, si_rep = 0, 0
 
         pesos_fac = fac_mo
         pesos_si = si_mo
