@@ -28,31 +28,71 @@ except Exception as e:
     hoja = None
     hoja_repuestos = None
 
-# --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
-# 1. Convertimos la pestaña TURNOS a la variable 'df' para el resto de la app
+# --- CONVERSIÓN Y LIMPIEZA INTEGRAL (PARA TODA LA APP) ---
+
+# Función para traducir fechas tipo "11-Mar" o "abr" al formato de Python
+def limpiar_fecha_ar(fecha_str):
+    if pd.isna(fecha_str) or str(fecha_str).strip() == '': return pd.NaT
+    f = str(fecha_str).strip().lower()
+    reemplazos = {'ene': 'jan', 'abr': 'apr', 'ago': 'aug', 'dic': 'dec'}
+    for es, en in reemplazos.items():
+        f = f.replace(es, en)
+    try:
+        dt = pd.to_datetime(f, dayfirst=True, errors='coerce')
+        if pd.notna(dt) and dt.year < 2000:
+            dt = dt.replace(year=pd.Timestamp.now().year)
+        return dt
+    except:
+        return pd.NaT
+
 if hoja is not None:
     try:
+        # 1. Leemos todo y lo pasamos a un DataFrame
         df = pd.DataFrame(hoja.get_all_records())
+        
+        # 2. Normalizamos nombres de columnas (Pasamos todo a MAYÚSCULAS y sin espacios)
+        # Esto hace que 'Fecha Prom', 'fecha prom' y 'FECHA PROM' sean lo mismo para la app
+        df.columns = [str(c).upper().strip() for c in df.columns]
+
+        # 3. Limpieza de Fechas para todas las pestañas
+        # Buscamos las columnas por palabras clave para no fallar
+        col_prom = next((c for c in df.columns if 'PROM' in c), None)
+        col_taller = next((c for c in df.columns if 'FECHA TALLER' in c), None)
+
+        if col_prom:
+            df['FECHA_PROM_DT'] = df[col_prom].apply(limpiar_fecha_ar)
+        if col_taller:
+            df['FECHA_TALLER_DT'] = df[col_taller].apply(limpiar_fecha_ar)
+
+        # Creamos una FECHA FINAL (usa Taller si existe, sino usa Promesa)
+        # Esta es la que van a usar todas las pestañas para los gráficos
+        if 'FECHA_TALLER_DT' in df.columns and 'FECHA_PROM_DT' in df.columns:
+            df['FECHA_FINAL'] = df['FECHA_TALLER_DT'].combine_first(df['FECHA_PROM_DT'])
+        elif 'FECHA_PROM_DT' in df.columns:
+            df['FECHA_FINAL'] = df['FECHA_PROM_DT']
+
     except Exception as e:
-        st.warning(f"Error al convertir TURNOS: {e}")
+        st.error(f"Error procesando los datos de TURNOS: {e}")
         df = pd.DataFrame()
 else:
     df = pd.DataFrame()
 
-# 2. Convertimos la pestaña REPUESTOS a la variable 'df_repuestos' (¡VERSIÓN ANTI-COLUMNAS VACÍAS!)
+# --- CONVERSIÓN DE REPUESTOS ---
 if hoja_repuestos is not None:
     try:
         datos_repuestos = hoja_repuestos.get_all_values()
         if datos_repuestos:
-            # Separamos la primera fila (títulos) del resto de los datos
             df_repuestos = pd.DataFrame(datos_repuestos[1:], columns=datos_repuestos[0])
+            df_repuestos.columns = [str(c).upper().strip() for c in df_repuestos.columns]
+            
+            # Limpiamos también las fechas de repuestos
+            if 'FECHA TALLER' in df_repuestos.columns:
+                df_repuestos['FECHA_DT'] = df_repuestos['FECHA TALLER'].apply(limpiar_fecha_ar)
         else:
             df_repuestos = pd.DataFrame()
     except Exception as e:
         st.warning(f"Error al convertir los datos de REPUESTOS: {e}")
         df_repuestos = pd.DataFrame()
-else:
-    df_repuestos = pd.DataFrame()
     
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Gestión Taller CENOA - Salta", layout="wide", initial_sidebar_state="expanded")
