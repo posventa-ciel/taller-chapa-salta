@@ -1151,26 +1151,27 @@ with tab_fac:
                 try: return float(x)
                 except: return 0.0
                 
-            df_rep['Monto Fac'] = df_rep['Monto Fac'].apply(limpiar_plata)
+            # Usamos la columna PRECIO real de tu pestaña de repuestos
+            df_rep['PRECIO_LIMPIO'] = df_rep['PRECIO'].apply(limpiar_plata)
+
+            # Convertimos FECHA TALLER para poder filtrar por mes
+            df_rep['Fecha_Dt'] = pd.to_datetime(df_rep['FECHA TALLER'], errors='coerce')
 
             # Filtramos los repuestos por el mes seleccionado en la app
             if mes_filtro != "TODOS":
-                # Asumo que mes_filtro es texto (ej. "ABRIL") y la columna Mes Fac también
-                df_rep = df_rep[df_rep['Mes Fac'].astype(str).str.strip().str.upper() == str(mes_filtro).upper()]
+                df_rep = df_rep[df_rep['Fecha_Dt'].dt.month == mes_num_filtro]
 
-            # Sumamos la columna 'Monto Fac' filtrando por la columna 'Estado' (FAC o SI)
-            fac_rep = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper() == 'FAC']['Monto Fac'].sum()
-            si_rep = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper() == 'SI']['Monto Fac'].sum()
+            # Sumamos la columna de plata filtrando por la columna 'FAC'
+            fac_rep = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper() == 'FAC']['PRECIO_LIMPIO'].sum()
+            si_rep = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper() == 'SI']['PRECIO_LIMPIO'].sum()
             
-        except NameError:
-            st.error("⚠️ Todavía no creaste la variable 'df_repuestos' leyendo el Google Sheets.")
-            fac_rep, si_rep = 0, 0
-        except KeyError:
-            st.error("⚠️ Verifica los nombres de las columnas en la pestaña REPUESTOS (Deben ser 'Monto Fac', 'Estado' y 'Mes Fac').")
+        except Exception as e:
+            st.error(f"⚠️ Error al calcular repuestos: Revisá que las columnas PRECIO, FAC y FECHA TALLER existan. ({e})")
             fac_rep, si_rep = 0, 0
 
-        pesos_fac = fac_mo
-        pesos_si = si_mo
+        # SUMA TOTAL PARA LAS TARJETAS GRANDES
+        pesos_fac = fac_mo + fac_rep
+        pesos_si = si_mo + si_rep
         pesos_est = pesos_fac + pesos_si
 
         panos_fac = df_fac['Paños'].sum()
@@ -1409,13 +1410,12 @@ with tab_fac:
         with tab_rep:
             st.write("**Detalle de Costos de Repuestos (FAC + SI)**")
             try:
-                # Usamos el df_rep que ya limpiamos y filtramos arriba
-                df_rep_tab = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper().isin(['FAC', 'SI'])]
-                df_rep_tab = df_rep_tab[df_rep_tab['Monto Fac'] > 0]
+                df_rep_tab = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper().isin(['FAC', 'SI'])]
+                df_rep_tab = df_rep_tab[df_rep_tab['PRECIO_LIMPIO'] > 0]
                 
                 if not df_rep_tab.empty:
-                    df_rep_disp = df_rep_tab[['Patente', 'Asesor', 'Monto Fac', 'Estado']].sort_values('Monto Fac', ascending=False)
-                    st.dataframe(df_rep_disp, hide_index=True, use_container_width=True, column_config={"Monto Fac": st.column_config.NumberColumn("Monto Fac ($)", format="$ %d")})
+                    df_rep_disp = df_rep_tab[['PATENTE', 'ASESOR', 'PRECIO_LIMPIO', 'FAC']].sort_values('PRECIO_LIMPIO', ascending=False)
+                    st.dataframe(df_rep_disp, hide_index=True, use_container_width=True, column_config={"PRECIO_LIMPIO": st.column_config.NumberColumn("Monto Fac ($)", format="$ %d")})
                 else:
                     st.info("No hay repuestos facturados o aprobados en este período.")
             except Exception as e:
@@ -1435,27 +1435,6 @@ with tab_fac:
         for _, row in errores_panos.iterrows():
             alertas.append({"Dominio": row['Patente'], "Error": "📦 Faltan Paños en auto activo", "Asesor": row['Asesor']})
 
-        if alertas:
-            df_alertas = pd.DataFrame(alertas)
-            st.error(f"⚠️ Se detectaron {len(df_alertas)} errores de carga en la planilla.")
-            st.dataframe(df_alertas, hide_index=True, use_container_width=True)
-        else:
-            st.success("✅ ¡Planilla impecable! No se detectaron errores de carga de datos críticos.")
-            
-        # --- AUDITORÍA DE DATOS ---
-        st.divider()
-        st.markdown("### 🚨 Auditoría de Carga (Detectores de Errores)")
-        st.write("Vehículos que requieren corrección manual en el Google Sheets por datos faltantes.")
-        
-        errores_precio = df[(df['Estado_Fac'].isin(['FAC', 'SI'])) & (df['Precio'] == 0)]
-        errores_panos = df[(~df['Estado_Taller'].str.contains("ENTREGADO", na=False)) & (df['Paños'] == 0)]
-
-        alertas = []
-        for _, row in errores_precio.iterrows():
-            alertas.append({"Dominio": row['Patente'], "Error": "💰 Falta M.O. en auto FAC/SI", "Asesor": row['Asesor']})
-        for _, row in errores_panos.iterrows():
-            alertas.append({"Dominio": row['Patente'], "Error": "📦 Faltan Paños en auto activo", "Asesor": row['Asesor']})
-            
         if alertas:
             df_alertas = pd.DataFrame(alertas)
             st.error(f"⚠️ Se detectaron {len(df_alertas)} errores de carga en la planilla.")
