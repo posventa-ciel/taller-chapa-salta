@@ -358,15 +358,16 @@ def obtener_datos_maestros():
             renames = {}
             for c in d.columns:
                 c_str = str(c).upper().strip()
-                # Renombramos usando "in" en lugar de igualdades exactas para ignorar espacios o caracteres raros
                 if 'ESTADO FAC' in c_str or c_str == 'FAC' or 'FACTURACION' in c_str: renames[c] = 'ESTADO_FAC'
                 elif c_str == 'ESTADO' or 'ESTADO TALLER' in c_str: renames[c] = 'ESTADO_TALLER'
                 elif 'FASE' in c_str: renames[c] = 'FASE_TALLER'
                 elif 'EMPRESA' in c_str or 'COMPAÑIA' in c_str or 'CLIENTE' in c_str:
                     if 'EMPRESA_TALLER' not in renames.values(): renames[c] = 'EMPRESA_TALLER'
                 elif 'OBSERVACION' in c_str or 'NOVEDAD' in c_str: renames[c] = 'OBSERVACIONES_TALLER'
-                elif 'F. PROM' in c_str or 'PROMESA' in c_str or 'ENTREGA' in c_str: 
+                elif 'PROM' in c_str or 'ENTREGA' in c_str: 
                     if 'HORA' not in c_str: renames[c] = 'FECHA_PROMESA_I'
+                elif 'FECHA TALLER' in c_str:
+                    renames[c] = 'FECHA_TALLER_REAL'
                 elif 'INGR' in c_str or 'RECEPCION' in c_str: renames[c] = 'FECHA_INGRESO_TALLER'
                 elif 'HS PROM' in c_str or 'HORA' in c_str: renames[c] = 'HORA_ENTREGA'
                 elif c_str == 'PATENTE' or c_str == 'DOMINIO': renames[c] = 'PATENTE'
@@ -387,7 +388,9 @@ def obtener_datos_maestros():
                 d = d[d['PATENTE'].str.strip() != ""]
                 d['GRUPO_ORIGEN'] = n
                 dfs.append(d)
-        except Exception as e: print(f"Error cargando pestaña {n}: {e}")
+                
+        except Exception as e: 
+            print(f"Error cargando pestaña {n}: {e}")
         
     if not dfs: return pd.DataFrame()
     df_raw = pd.concat(dfs, ignore_index=True)
@@ -395,7 +398,11 @@ def obtener_datos_maestros():
     col_chasis = next((c for c in df_raw.columns if 'CHASIS' in c or 'VIN' in c), None)
     
     for _, row in df_raw.iterrows():
-        f_fin = parsear_fecha_español(row.get('FECHA_PROMESA_I', ''))
+        f_promesa_original = parsear_fecha_español(row.get('FECHA_PROMESA_I', ''))
+        f_taller_real = parsear_fecha_español(row.get('FECHA_TALLER_REAL', ''))
+        
+        f_fin = f_taller_real if f_taller_real else f_promesa_original
+        
         f_fin_disp = f_fin.date() if f_fin else None
         if not f_fin: f_fin = datetime.now() + timedelta(days=3650) 
         
@@ -408,7 +415,6 @@ def obtener_datos_maestros():
                     break
 
         f_ingreso = parsear_fecha_español(row.get('FECHA_INGRESO_TALLER', ''))
-        f_ticket = parsear_fecha_español(row.get('FECHA_TICKET', ''))
         
         def limpiar_num(val):
             v = str(val).replace('$', '').replace('.', '').replace(',', '.').strip()
@@ -432,8 +438,11 @@ def obtener_datos_maestros():
             'Grupo': row.get('GRUPO_ORIGEN'), 'Asesor': asesor, 'Cliente': cliente,
             'Patente': str(row.get('PATENTE', '')), 'Vehiculo': str(row.get('VEHICULO', '')), 
             'Chasis': str(row.get(col_chasis, '')).upper() if col_chasis else "",
-            'Inicio': f_fin - timedelta(days=max(1, int(panos))), 'Fin': f_fin, 'Fecha_Promesa_Disp': f_fin_disp, 
-            'Fecha_Ingreso': f_ingreso.date() if f_ingreso else None, 'Fecha_Ticket': f_ticket.date() if f_ticket else None,
+            'Inicio': f_fin - timedelta(days=max(1, int(panos))), 
+            'Fin': f_fin, 
+            'Fecha_Promesa_Disp': f_fin_disp, 
+            'Fecha_Ingreso': f_ingreso.date() if f_ingreso else None, 
+            'Fecha_Ticket': f_promesa_original.date() if f_promesa_original else None, 
             'Hora_Entrega': str(row.get('HORA_ENTREGA', '')).replace('nan', '').strip(),
             'Mes_Hist': mes_hist, 'Paños': panos, 'Dias_Reparacion': dias_rep, 'Tipo_ABC': clasificar_abc(panos),
             'Estado_Fac': estado_fac, 'Estado_Taller': estado, 'Fase_Taller': fase, 
