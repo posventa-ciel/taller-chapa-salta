@@ -1377,12 +1377,18 @@ with tab_fac:
 
         with tab_rep:
             st.write("**Detalle de Costos de Repuestos (FAC + SI)**")
-            df_rep_tab = df_analisis[(df_analisis['Costo'] > 0) & (df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)']))]
-            if not df_rep_tab.empty:
-                df_rep_disp = df_rep_tab[['Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Costo', 'Estado_Resumen']].sort_values('Costo', ascending=False)
-                st.dataframe(df_rep_disp, hide_index=True, use_container_width=True, column_config={"Costo": st.column_config.NumberColumn("Costo Repuestos ($)", format="$ %d")})
-            else:
-                st.info("No hay repuestos facturados o aprobados en este período.")
+            try:
+                # Usamos el df_rep que ya limpiamos y filtramos arriba
+                df_rep_tab = df_rep[df_rep['Estado'].astype(str).str.strip().str.upper().isin(['FAC', 'SI'])]
+                df_rep_tab = df_rep_tab[df_rep_tab['Monto Fac'] > 0]
+                
+                if not df_rep_tab.empty:
+                    df_rep_disp = df_rep_tab[['Patente', 'Asesor', 'Monto Fac', 'Estado']].sort_values('Monto Fac', ascending=False)
+                    st.dataframe(df_rep_disp, hide_index=True, use_container_width=True, column_config={"Monto Fac": st.column_config.NumberColumn("Monto Fac ($)", format="$ %d")})
+                else:
+                    st.info("No hay repuestos facturados o aprobados en este período.")
+            except Exception as e:
+                st.info("Conectá correctamente la pestaña de REPUESTOS para ver el detalle.")
 
         # --- AUDITORÍA DE DATOS ---
         st.divider()
