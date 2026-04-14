@@ -205,82 +205,127 @@ def obtener_proxima_fecha_libre(dias_carga):
     return f"{DIAS_SEMANA[fecha.weekday()]} {fecha.strftime('%d/%m')}"
 
 @st.cache_data(ttl=300)
-def obtener_turnos():
-    columnas_base = ['Tipo', 'Fecha', 'Hora', 'Vehiculo', 'Patente', 'Asesor', 'Precio', 'Paños', 'Observaciones', 'Tiempo_Entrega', 'Cliente', 'Seguro', 'Ticket', 'Recibido', 'Fotos', 'Referencia', 'Cancelado', 'Motivo_Cancelacion', 'Eliminar']
-    if GID_TURNOS == "PONER_AQUI_GID_TURNOS": return pd.DataFrame(columns=columnas_base)
-    
-    try:
-        d = pd.read_csv(f"{URL_BASE}{GID_TURNOS}", dtype=str)
-        d.columns = d.columns.str.strip().str.upper()
-        
-        # 1. Búsqueda radar de la columna Patente
-        col_patente = next((c for c in d.columns if 'PATENTE' in c or 'DOMINIO' in c), None)
-        if col_patente:
-            d = d.dropna(subset=[col_patente])
-            d = d[d[col_patente].str.strip() != ""]
-        else:
-            return pd.DataFrame(columns=columnas_base) 
+def obtener_datos_maestros():
+    dfs = []
+    for n, gid in GIDS.items():
+        try:
+            d_raw = pd.read_csv(f"{URL_BASE}{gid}", dtype=str, header=None)
+            
+            idx_header = 0
+            for i in range(min(15, len(d_raw))):
+                fila_str = " ".join(d_raw.iloc[i].fillna("").astype(str).str.upper())
+                # Buscamos la fila de títulos escaneando si tiene alguna de estas palabras
+                if 'DOMINIO' in fila_str or 'PATENTE' in fila_str or 'CHASIS' in fila_str or 'VEHICULO' in fila_str:
+                    idx_header = i
+                    break
+                    
+            cols = []
+            for j, val in enumerate(d_raw.iloc[idx_header]):
+                val_str = str(val).strip().upper()
+                if val_str == 'NAN' or val_str == 'NONE' or not val_str: cols.append(f"VACIA_{j}")
+                else: cols.append(val_str)
+                
+            d_raw.columns = cols
+            d = d_raw.iloc[idx_header + 1:].reset_index(drop=True)
 
-        # 2. Búsqueda radar del resto de las columnas
-        col_recibido = next((c for c in d.columns if 'RECIBID' in c), None)
-        col_fotos = next((c for c in d.columns if 'FOTO' in c), None)
-        col_turno = next((c for c in d.columns if 'TURNO' in c and 'HORA' not in c), 'TURNO')
-        col_motivo = next((c for c in d.columns if 'MOTIVO' in c or 'CANCELACION' in c), None)
-        col_fecha = next((c for c in d.columns if 'FECH' in c), None)
-        col_tiempo = next((c for c in d.columns if 'TIEMPO' in c), None)
-        col_ticket = next((c for c in d.columns if 'TICKET' in c), None)
-        col_referencia = next((c for c in d.columns if 'REFERENCIA' in c or 'REF' in c), None)
-        col_hora = next((c for c in d.columns if 'HORA' in c), None)
-        col_vehiculo = next((c for c in d.columns if 'VEHICULO' in c or 'MARCA' in c), None)
-        col_asesor = next((c for c in d.columns if 'ASESOR' in c), None)
-        col_precio = next((c for c in d.columns if 'PRECIO' in c or 'MONTO' in c), None)
-        col_panos = next((c for c in d.columns if 'PAÑO' in c or 'PANO' in c), None)
-        col_obs = next((c for c in d.columns if 'OBSERVACION' in c), None)
-        col_cliente = next((c for c in d.columns if 'CLIENTE' in c or 'EMPRESA' in c), None)
-        col_seguro = next((c for c in d.columns if 'SEGURO' in c or 'COMPAÑIA' in c), None)
-            
-        filas = []
-        for _, row in d.iterrows():
-            fecha_turno = parsear_fecha_español(row.get(col_fecha, '')) if col_fecha else datetime.now()
-            
-            asesor_raw = str(row.get(col_asesor, 'SIN ASIGNAR')).strip().upper() if col_asesor else "SIN ASIGNAR"
-            if not asesor_raw or asesor_raw == 'NAN': asesor_raw = "SIN ASIGNAR"
-            
-            val_recibido = str(row.get(col_recibido, '')).strip().upper() if col_recibido else ""
-            bool_recibido = val_recibido in ['SI', 'SÍ', 'TRUE', '1', 'X']
-            
-            val_fotos = str(row.get(col_fotos, '')).strip().upper() if col_fotos else ""
-            bool_fotos = val_fotos in ['SI', 'SÍ', 'TRUE', '1', 'X']
-            
-            val_ticket = str(row.get(col_ticket, '')).strip() if col_ticket else ""
-            val_ticket = "" if val_ticket == 'nan' else val_ticket
-            
-            val_referencia = str(row.get(col_referencia, '')).strip() if col_referencia else ""
-            val_referencia = "" if val_referencia == 'nan' else val_referencia
-            
-            val_motivo_str = str(row.get(col_motivo, '')).replace('nan', '').strip() if col_motivo else ""
-            val_turno_str = str(row.get(col_turno, '')).strip().upper() if col_turno else ""
-            
-            es_cancelado = val_turno_str in ["CANCELADO", "C"]
-            tipo_turno = '🚶‍♂️ SIN TURNO' if val_turno_str in ["N", "NO"] else '📅 PROGRAMADO'
-            
-            filas.append({
-                'Tipo': tipo_turno, 'Fecha': fecha_turno.date() if hasattr(fecha_turno, 'date') else fecha_turno, 
-                'Hora': str(row.get(col_hora, '')).strip() if col_hora else "",
-                'Vehiculo': str(row.get(col_vehiculo, '')).upper() if col_vehiculo else "", 
-                'Patente': str(row.get(col_patente, '')).upper(),
-                'Asesor': asesor_raw, 'Precio': str(row.get(col_precio, '')).strip() if col_precio else "", 
-                'Paños': str(row.get(col_panos, '')).strip() if col_panos else "",
-                'Observaciones': str(row.get(col_obs, '')).strip() if col_obs else "", 
-                'Tiempo_Entrega': str(row.get(col_tiempo, '')) if col_tiempo else "",
-                'Cliente': str(row.get(col_cliente, '')).upper() if col_cliente else "", 
-                'Seguro': str(row.get(col_seguro, '')).upper() if col_seguro else "",
-                'Ticket': val_ticket, 'Referencia': val_referencia, 'Recibido': bool_recibido, 'Fotos': bool_fotos, 
-                'Cancelado': es_cancelado, 'Motivo_Cancelacion': val_motivo_str, 'Eliminar': False
-            })
-            
-        # SOLUCIÓN: Forzamos las columnas incluso si 'filas' está vacía
-        return pd.DataFrame(filas, columns=columnas_base)
+            renames = {}
+            for c in d.columns:
+                c_str = str(c).upper().strip()
+                if 'ESTADO FAC' in c_str or c_str == 'FAC' or 'FACTURACION' in c_str: renames[c] = 'ESTADO_FAC'
+                elif c_str == 'ESTADO' or 'ESTADO TALLER' in c_str: renames[c] = 'ESTADO_TALLER'
+                elif 'FASE' in c_str: renames[c] = 'FASE_TALLER'
+                elif 'EMPRESA' in c_str or 'COMPAÑIA' in c_str or 'CLIENTE' in c_str:
+                    if 'EMPRESA_TALLER' not in renames.values(): renames[c] = 'EMPRESA_TALLER'
+                elif 'OBSERVACION' in c_str or 'NOVEDAD' in c_str: renames[c] = 'OBSERVACIONES_TALLER'
+                # --- SOLUCIÓN DE FECHAS 1: Ahora sí lee FECHA PROM ---
+                elif 'PROM' in c_str or 'ENTREGA' in c_str: 
+                    if 'HORA' not in c_str: renames[c] = 'FECHA_PROMESA_I'
+                # --- SOLUCIÓN DE FECHAS 2: Ahora lee FECHA TALLER ---
+                elif 'FECHA TALLER' in c_str:
+                    renames[c] = 'FECHA_TALLER_REAL'
+                elif 'INGR' in c_str or 'RECEPCION' in c_str: renames[c] = 'FECHA_INGRESO_TALLER'
+                elif 'HS PROM' in c_str or 'HORA' in c_str: renames[c] = 'HORA_ENTREGA'
+                elif c_str == 'PATENTE' or c_str == 'DOMINIO': renames[c] = 'PATENTE'
+                elif c_str == 'PRECIO' or c_str == 'MONTO': renames[c] = 'PRECIO'
+                elif c_str == 'COSTO': renames[c] = 'COSTO'
+                elif c_str == 'ASESOR' or 'RECEPCIONISTA' in c_str: renames[c] = 'ASESOR'
+                elif c_str == 'VEHICULO' or 'MARCA' in c_str or 'MODELO' in c_str: renames[c] = 'VEHICULO'
+                elif c_str == 'PAÑOS' or 'PAÑO' in c_str or 'PANO' in c_str: renames[c] = 'PAÑOS'
+                elif 'DIAS' in c_str and ('TRABAJO' in c_str or 'REP' in c_str): renames[c] = 'DIAS_TRABAJO'
+                elif c_str == 'MES': renames[c] = 'MES'
+
+            d = d.rename(columns=renames)
+            if 'MES' in d.columns: d['MES'] = d['MES'].replace(r'^\s*$', pd.NA, regex=True).ffill()
+            d = d.loc[:, ~d.columns.duplicated()]
+
+            if 'PATENTE' in d.columns: 
+                d = d.dropna(subset=['PATENTE'])
+                d = d[d['PATENTE'].str.strip() != ""]
+                d['GRUPO_ORIGEN'] = n
+                dfs.append(d)
+        except Exception as e: print(f"Error cargando pestaña {n}: {e}")
+        
+    if not dfs: return pd.DataFrame()
+    df_raw = pd.concat(dfs, ignore_index=True)
+    filas = []
+    col_chasis = next((c for c in df_raw.columns if 'CHASIS' in c or 'VIN' in c), None)
+    
+    for _, row in df_raw.iterrows():
+        # --- EL MOTOR INTELIGENTE DE FECHAS ---
+        f_promesa_original = parsear_fecha_español(row.get('FECHA_PROMESA_I', ''))
+        f_taller_real = parsear_fecha_español(row.get('FECHA_TALLER_REAL', ''))
+        
+        # LA REGLA DE ORO: Si existe FECHA TALLER, gana esa. Si no, queda la PROMESA.
+        f_fin = f_taller_real if f_taller_real else f_promesa_original
+        
+        f_fin_disp = f_fin.date() if f_fin else None
+        if not f_fin: f_fin = datetime.now() + timedelta(days=3650) 
+        
+        mes_hist = f_fin.strftime('%Y-%m') if f_fin.year < 2030 else "SIN FECHA"
+        if 'MES' in row and pd.notna(row['MES']):
+            mes_str = str(row['MES']).strip().lower()
+            for m_name, m_num in MESES_ES.items():
+                if m_name in mes_str:
+                    mes_hist = f"{datetime.now().year}-{m_num:02d}"
+                    break
+
+        f_ingreso = parsear_fecha_español(row.get('FECHA_INGRESO_TALLER', ''))
+        
+        def limpiar_num(val):
+            v = str(val).replace('$', '').replace('.', '').replace(',', '.').strip()
+            try: return float(re.findall(r"[-+]?\d*\.\d+|\d+", v)[0]) if re.findall(r"[-+]?\d*\.\d+|\d+", v) else 0.0
+            except: return 0.0
+
+        panos = limpiar_num(row.get('PAÑOS', 0))
+        dias_rep = limpiar_num(row.get('DIAS_TRABAJO', 0))
+        precio_val = limpiar_num(row.get('PRECIO', 0))
+        costo_val = limpiar_num(row.get('COSTO', 0))
+        
+        estado_fac = str(row.get('ESTADO_FAC', '')).replace('.', '').strip().upper()
+        estado = str(row.get('ESTADO_TALLER', '')).replace('nan', '').strip().upper() or "SIN ESTADO"
+        cliente = str(row.get('EMPRESA_TALLER', 'PARTICULAR')).replace('nan', '').strip().upper() or "PARTICULAR"
+        asesor = str(row.get('ASESOR', '')).strip().upper()
+        if asesor == 'NAN' or not asesor: asesor = "SIN ASIGNAR"
+        fase = str(row.get('FASE_TALLER', '')).replace('nan', '').strip().upper()
+        if not fase: fase = "SIN FASE ASIGNADA"
+
+        filas.append({
+            'Grupo': row.get('GRUPO_ORIGEN'), 'Asesor': asesor, 'Cliente': cliente,
+            'Patente': str(row.get('PATENTE', '')), 'Vehiculo': str(row.get('VEHICULO', '')), 
+            'Chasis': str(row.get(col_chasis, '')).upper() if col_chasis else "",
+            'Inicio': f_fin - timedelta(days=max(1, int(panos))), 
+            'Fin': f_fin, 
+            'Fecha_Promesa_Disp': f_fin_disp, 
+            'Fecha_Ingreso': f_ingreso.date() if f_ingreso else None, 
+            # Guardamos la promesa original pura por si querés ver cuánto se demoró
+            'Fecha_Ticket': f_promesa_original.date() if f_promesa_original else None, 
+            'Hora_Entrega': str(row.get('HORA_ENTREGA', '')).replace('nan', '').strip(),
+            'Mes_Hist': mes_hist, 'Paños': panos, 'Dias_Reparacion': dias_rep, 'Tipo_ABC': clasificar_abc(panos),
+            'Estado_Fac': estado_fac, 'Estado_Taller': estado, 'Fase_Taller': fase, 
+            'Precio': precio_val, 'Costo': costo_val,
+            'Observaciones': str(row.get('OBSERVACIONES_TALLER', '')).replace('nan', '').strip()
+        })
+    return pd.DataFrame(filas)
         
     except Exception as e: 
         print(f"Error cargando turnos: {e}")
