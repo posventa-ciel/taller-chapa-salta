@@ -1120,8 +1120,9 @@ with tab_fac:
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
 
         # --- CÁLCULOS DE MANO DE OBRA (Desde la pestaña principal) ---
-        fac_mo = df_fac['Precio'].sum()
-        si_mo = df_si['Precio'].sum()
+        # Guardamos el total bruto (que ya descubrimos que viene con los repuestos sumados adentro)
+        fac_mo_bruto = df_fac['Precio'].sum()
+        si_mo_bruto = df_si['Precio'].sum()
 
         # --- CÁLCULOS DE REPUESTOS (Desde la pestaña 'df_repuestos') ---
         try:
@@ -1130,37 +1131,34 @@ with tab_fac:
             # Limpiador mágico: saca signos $, espacios, y arregla puntos/comas
             def limpiar_plata(x):
                 if isinstance(x, (int, float)): return float(x)
-                x = str(x).replace('$', '').replace(' ', '').replace('.', '') # saco miles
-                x = x.replace(',', '.') # paso coma decimal a punto
+                x = str(x).replace('$', '').replace(' ', '').replace('.', '') 
+                x = x.replace(',', '.') 
                 try: return float(x)
                 except: return 0.0
                 
-            # Usamos la columna PRECIO real de tu pestaña de repuestos
             df_rep['PRECIO_LIMPIO'] = df_rep['PRECIO'].apply(limpiar_plata)
 
-            # Convertimos FECHA TALLER para poder filtrar por mes
             df_rep['Fecha_Dt'] = pd.to_datetime(df_rep['FECHA TALLER'], errors='coerce')
 
-            # Filtramos los repuestos por el mes seleccionado en la app
             if mes_filtro != "TODOS":
                 df_rep = df_rep[df_rep['Fecha_Dt'].dt.month == mes_num_filtro]
 
-            # Sumamos la columna de plata filtrando por la columna 'FAC'
             fac_rep = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper() == 'FAC']['PRECIO_LIMPIO'].sum()
             si_rep = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper() == 'SI']['PRECIO_LIMPIO'].sum()
             
         except Exception as e:
-            st.error(f"⚠️ Error al calcular repuestos: Revisá que las columnas PRECIO, FAC y FECHA TALLER existan. ({e})")
+            st.error(f"⚠️ Error al calcular repuestos: {e}")
             fac_rep, si_rep = 0, 0
+
+        # --- MAGIA MATEMÁTICA: SEPARACIÓN DE M.O. PURA ---
+        # Le restamos al total bruto los repuestos para que la M.O. quede limpia (ej: 10.2M - 2.4M = 7.7M)
+        fac_mo = fac_mo_bruto - fac_rep
+        si_mo = si_mo_bruto - si_rep
 
         # SUMA TOTAL PARA LAS TARJETAS GRANDES
         pesos_fac = fac_mo + fac_rep
         pesos_si = si_mo + si_rep
         pesos_est = pesos_fac + pesos_si
-
-        panos_fac = df_fac['Paños'].sum()
-        panos_si = df_si['Paños'].sum()
-        panos_est = panos_fac + panos_si
 
         porcentaje_logro = min((panos_est / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
 
