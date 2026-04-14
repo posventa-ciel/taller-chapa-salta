@@ -16,10 +16,28 @@ try:
     gc = gspread.service_account_from_dict(creds_dict)
     ID_PLANILLA = "1yVeTn7UJV5izBURIXFjROwnH1xD8L3vDpesPVZzy45c" # SALTA ID
     planilla = gc.open_by_key(ID_PLANILLA)
+    
+    # 1. Traemos la pestaña principal
     hoja = planilla.worksheet("TURNOS")
+    
+    # 2. Traemos la pestaña de Repuestos (¡NUEVO!)
+    hoja_repuestos = planilla.worksheet("REPUESTOS")
+    
 except Exception as e:
     st.error(f"Error de conexión a Google Sheets: {e}")
     hoja = None
+    hoja_repuestos = None
+
+# --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
+# Acá aseguramos que exista df_repuestos para que la Pestaña 4 no tire error
+if hoja_repuestos is not None:
+    try:
+        df_repuestos = pd.DataFrame(hoja_repuestos.get_all_records())
+    except Exception as e:
+        st.warning("No se pudieron leer los datos de la pestaña REPUESTOS.")
+        df_repuestos = pd.DataFrame()
+else:
+    df_repuestos = pd.DataFrame()
     
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Gestión Taller CENOA - Salta", layout="wide", initial_sidebar_state="expanded")
