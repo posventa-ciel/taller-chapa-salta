@@ -1103,10 +1103,13 @@ with tab_fac:
         st.subheader("🎯 Análisis de Facturación, Paños y Objetivos")
 
         df_analisis = df.copy()
+        
+        # Le enseñamos a la app cómo se llama tu columna de fecha
+        COL_FECHA = 'FECHA PROM' if 'FECHA PROM' in df_analisis.columns else 'Fecha_Promesa_Disp'
 
         def clasificar_estado(row):
-            est_taller = str(row['Estado_Taller']).upper()
-            est_fac = str(row['Estado_Fac']).upper()
+            est_taller = str(row.get('Estado_Taller', '')).upper()
+            est_fac = str(row.get('Estado_Fac', '')).upper()
 
             if 'DETENIDO' in est_taller: return 'En Taller (Otros)'
             if est_fac == 'FAC': return 'Facturado (FAC)'
@@ -1115,20 +1118,18 @@ with tab_fac:
 
         df_analisis['Estado_Resumen'] = df_analisis.apply(clasificar_estado, axis=1)
 
-        # Separamos los estados (usando lo que ya filtró la barra lateral de la app)
+        # Separamos los estados
         df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
         df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
 
-        # --- CÁLCULOS DE MANO DE OBRA (Desde la pestaña principal) ---
-        # Guardamos el total bruto (que ya descubrimos que viene con los repuestos sumados adentro)
-        fac_mo_bruto = df_fac['Precio'].sum()
-        si_mo_bruto = df_si['Precio'].sum()
+        # --- CÁLCULOS DE MANO DE OBRA BRUTA ---
+        fac_mo_bruto = df_fac['Precio'].sum() if 'Precio' in df_fac.columns else 0
+        si_mo_bruto = df_si['Precio'].sum() if 'Precio' in df_si.columns else 0
 
-        # --- CÁLCULOS DE REPUESTOS (Desde la pestaña 'df_repuestos') ---
+        # --- CÁLCULOS DE REPUESTOS ---
         try:
             df_rep = df_repuestos.copy()
             
-            # Limpiador mágico: saca signos $, espacios, y arregla puntos/comas
             def limpiar_plata(x):
                 if isinstance(x, (int, float)): return float(x)
                 x = str(x).replace('$', '').replace(' ', '').replace('.', '') 
@@ -1137,7 +1138,6 @@ with tab_fac:
                 except: return 0.0
                 
             df_rep['PRECIO_LIMPIO'] = df_rep['PRECIO'].apply(limpiar_plata)
-
             df_rep['Fecha_Dt'] = pd.to_datetime(df_rep['FECHA TALLER'], errors='coerce')
 
             if mes_filtro != "TODOS":
@@ -1147,18 +1147,21 @@ with tab_fac:
             si_rep = df_rep[df_rep['FAC'].astype(str).str.strip().str.upper() == 'SI']['PRECIO_LIMPIO'].sum()
             
         except Exception as e:
-            st.error(f"⚠️ Error al calcular repuestos: {e}")
             fac_rep, si_rep = 0, 0
 
-        # --- MAGIA MATEMÁTICA: SEPARACIÓN DE M.O. PURA ---
-        # Le restamos al total bruto los repuestos para que la M.O. quede limpia (ej: 10.2M - 2.4M = 7.7M)
-        fac_mo = fac_mo_bruto - fac_rep
-        si_mo = si_mo_bruto - si_rep
+        # --- MAGIA MATEMÁTICA: M.O. PURA ---
+        fac_mo = max(0, fac_mo_bruto - fac_rep)
+        si_mo = max(0, si_mo_bruto - si_rep)
 
-        # SUMA TOTAL PARA LAS TARJETAS GRANDES
+        # --- SUMAS TOTALES ---
         pesos_fac = fac_mo + fac_rep
         pesos_si = si_mo + si_rep
         pesos_est = pesos_fac + pesos_si
+
+        # 🛠️ ¡ACÁ ESTÁ LA SOLUCIÓN DEL ERROR! Volvemos a sumar los paños
+        panos_fac = df_fac['Paños'].sum() if 'Paños' in df_fac.columns else 0
+        panos_si = df_si['Paños'].sum() if 'Paños' in df_si.columns else 0
+        panos_est = panos_fac + panos_si
 
         porcentaje_logro = min((panos_est / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
 
@@ -1179,7 +1182,6 @@ with tab_fac:
         st.write("### 💰 Rendimiento y Proyección al Cierre")
         c_r1, c_r2, c_r3 = st.columns(3)
 
-        # Tarjetas estilo Salta (Fondo blanco, borde color)
         c_r1.markdown(f'''
         <div class="metric-card" style="background-color: white; border-left: 5px solid #28a745;">
             <div class="metric-title" style="color: #28a745;">Facturado Actual (FAC)</div>
@@ -1209,13 +1211,13 @@ with tab_fac:
         df_tpf = df[df['Estado_Taller'].str.contains("TERM PEND FACT", na=False)]
         df_tpe = df[df['Estado_Taller'].str.contains("TERM PEND ENTREG", na=False)]
         df_epf = df[df['Estado_Taller'].str.contains("ENTREGADO PEND FACT", na=False)]
-        rep_pendientes = df_tpf['Costo'].sum() + df_tpe['Costo'].sum() + df_epf['Costo'].sum()
+        rep_pendientes = df_tpf['Costo'].sum() + df_tpe['Costo'].sum() + df_epf['Costo'].sum() if 'Costo' in df.columns else 0
 
         st.write("### 🚨 Detalle de Estados Pendientes (Plata Inmovilizada)")
         c_e1, c_e2, c_e3, c_e4 = st.columns(4)
-        c_e1.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Facturar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpf["Precio"].sum())}</div><div class="metric-subtitle-red">⚠️ {df_tpf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e2.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Entregar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpe["Precio"].sum())}</div><div class="metric-subtitle-blue">⏳ {df_tpe["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
-        c_e3.markdown(f'<div class="metric-card"><div class="metric-title">Entregados (Pend. Facturar)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_epf["Precio"].sum())}</div><div class="metric-subtitle-green">🚚 {df_epf["Paños"].sum():.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e1.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Facturar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpf["Precio"].sum())}</div><div class="metric-subtitle-red">⚠️ {df_tpf["Paños"].sum() if "Paños" in df_tpf else 0:.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e2.markdown(f'<div class="metric-card"><div class="metric-title">Term. Pend. Entregar</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_tpe["Precio"].sum())}</div><div class="metric-subtitle-blue">⏳ {df_tpe["Paños"].sum() if "Paños" in df_tpe else 0:.1f} paños</div></div>', unsafe_allow_html=True)
+        c_e3.markdown(f'<div class="metric-card"><div class="metric-title">Entregados (Pend. Facturar)</div><div class="metric-value-money" style="font-size: 1.4rem;">{formato_pesos(df_epf["Precio"].sum())}</div><div class="metric-subtitle-green">🚚 {df_epf["Paños"].sum() if "Paños" in df_epf else 0:.1f} paños</div></div>', unsafe_allow_html=True)
         c_e4.markdown(f'<div class="metric-card" style="background-color: #fff3cd;"><div class="metric-title" style="color: #856404;">Repuestos Pendientes</div><div class="metric-value-money" style="font-size: 1.4rem; color: #856404;">{formato_pesos(rep_pendientes)}</div><div class="metric-subtitle-gray" style="color: #856404;">⚙️ En autos sin facturar</div></div>', unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
@@ -1225,49 +1227,54 @@ with tab_fac:
 
             df_si_detail = df_si.copy()
             def status_si(row):
-                est = str(row['Estado_Taller']).upper()
-                f_prom = row['Fecha_Promesa_Disp']
+                est = str(row.get('Estado_Taller', '')).upper()
+                f_prom = row.get(COL_FECHA)
+                
+                # Convertimos a fecha para comparar
+                if pd.notna(f_prom):
+                    try:
+                        f_prom = pd.to_datetime(f_prom).date()
+                    except:
+                        f_prom = None
 
                 if 'ENTREGADO' in est: return '1. 🚚 Entregados (Pendiente Facturar)'
                 if 'TERM PEND ENTREG' in est: return '2. ⏳ Terminados (Pendiente Entregar)'
                 if 'TERM' in est: return '3. ⚠️ Terminados (Pendiente Facturar)'
-                if pd.notna(f_prom) and f_prom < hoy.date(): return '5. 🔴 Atrasados en Producción'
+                if f_prom and f_prom < hoy.date(): return '5. 🔴 Atrasados en Producción'
                 return '4. 🟢 En Taller (A tiempo)'
 
             df_si_detail['Categoría_Real'] = df_si_detail.apply(status_si, axis=1)
 
             resumen_si_cat = df_si_detail.groupby('Categoría_Real').agg(
                 Vehículos=('Patente', 'count'),
-                Paños=('Paños', 'sum'),
-                MO=('Precio', 'sum'),
-                Repuestos=('Costo', 'sum')
+                Paños=('Paños', 'sum') if 'Paños' in df_si_detail.columns else ('Precio', 'count'),
+                MO=('Precio', 'sum')
             ).reset_index().sort_values('Categoría_Real')
 
             resumen_si_cat['M.O. ($)'] = resumen_si_cat['MO'].apply(formato_pesos)
-            resumen_si_cat['Repuestos ($)'] = resumen_si_cat['Repuestos'].apply(formato_pesos)
-
-            st.dataframe(resumen_si_cat[['Categoría_Real', 'Vehículos', 'Paños', 'M.O. ($)', 'Repuestos ($)']], hide_index=True, use_container_width=True)
+            
+            st.dataframe(resumen_si_cat[['Categoría_Real', 'Vehículos', 'Paños', 'M.O. ($)']], hide_index=True, use_container_width=True)
 
         st.write("### 🔭 Radar del Mes Siguiente (Estado 'NO')")
-        st.write("Vehículos marcados con estado **'NO'** en la facturación. Esto representa el colchón de trabajo/plata que se patea y asegura para arrancar el próximo mes.")
-
-        df_no = df_completo[df_completo['Estado_Fac'] == 'NO'].copy()
+        df_no = df_completo[df_completo['Estado_Fac'] == 'NO'].copy() if 'Estado_Fac' in df_completo.columns else pd.DataFrame()
 
         if not df_no.empty:
-            p_no = df_no['Precio'].sum()
-            c_no = df_no['Costo'].sum()
-            pa_no = df_no['Paños'].sum()
-            a_no = df_no['Patente'].count()
+            p_no = df_no['Precio'].sum() if 'Precio' in df_no.columns else 0
+            pa_no = df_no['Paños'].sum() if 'Paños' in df_no.columns else 0
+            a_no = df_no['Patente'].count() if 'Patente' in df_no.columns else 0
 
             c_n1, c_n2, c_n3 = st.columns(3)
             c_n1.markdown(f'<div class="metric-card" style="border-left: 5px solid #6f42c1;"><div class="metric-title">Autos para Próx. Mes</div><div class="metric-value-number" style="color:#6f42c1;">{a_no}</div></div>', unsafe_allow_html=True)
             c_n2.markdown(f'<div class="metric-card" style="border-left: 5px solid #6f42c1;"><div class="metric-title">Paños Asegurados</div><div class="metric-value-number" style="color:#6f42c1;">{pa_no:.1f}</div></div>', unsafe_allow_html=True)
-            c_n3.markdown(f'<div class="metric-card" style="border-left: 5px solid #6f42c1;"><div class="metric-title">M.O. Proyectada</div><div class="metric-value-money" style="color:#6f42c1;">{formato_pesos(p_no)}</div><div style="font-size: 0.8em; color: gray;">+ Rep: {formato_pesos(c_no)}</div></div>', unsafe_allow_html=True)
+            c_n3.markdown(f'<div class="metric-card" style="border-left: 5px solid #6f42c1;"><div class="metric-title">M.O. Proyectada</div><div class="metric-value-money" style="color:#6f42c1;">{formato_pesos(p_no)}</div></div>', unsafe_allow_html=True)
 
             with st.expander("Ver detalle de los autos marcados con 'NO'"):
                 df_no_show = df_no.copy()
-                df_no_show['Fecha Promesa'] = df_no_show['Fecha_Promesa_Disp'].apply(lambda x: x.strftime('%d/%m/%Y') if pd.notna(x) else "Sin Fecha")
-                st.dataframe(df_no_show[['Fecha Promesa', 'Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Paños', 'Precio']], hide_index=True, use_container_width=True)
+                df_no_show['Fecha Promesa'] = pd.to_datetime(df_no_show.get(COL_FECHA), errors='coerce').dt.strftime('%d/%m/%Y').fillna("Sin Fecha")
+                cols_to_show = ['Fecha Promesa', 'Patente', 'Vehiculo', 'Cliente', 'Asesor', 'Paños', 'Precio']
+                # filtramos las columnas que existan para que no tire error
+                cols_to_show = [c for c in cols_to_show if c in df_no_show.columns]
+                st.dataframe(df_no_show[cols_to_show], hide_index=True, use_container_width=True)
         else:
             st.info("No hay vehículos marcados con 'NO' en la planilla todavía.")
 
@@ -1276,8 +1283,7 @@ with tab_fac:
         # --- GRÁFICOS DE CURVAS ---
         if mes_filtro != "TODOS":
             st.markdown("### 📈 Curva de Producción y Facturación del Mes")
-            st.write("Muestra cómo se acumula la plata y el trabajo diario en el mes.")
-
+            
             primer_dia = date(año_filtro, mes_num_filtro, 1)
             _, ult_dia = calendar.monthrange(año_filtro, mes_num_filtro)
             fechas_mes = [date(año_filtro, mes_num_filtro, d) for d in range(1, ult_dia + 1)]
@@ -1291,22 +1297,26 @@ with tab_fac:
             df_proyeccion = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
 
             def asignar_fecha_curva(row):
-                f = row['Fecha_Promesa_Disp']
-                if pd.isna(f) or f.month != mes_num_filtro or f.year != año_filtro:
+                f = row.get(COL_FECHA)
+                try:
+                    f = pd.to_datetime(f).date()
+                    if pd.isna(f) or f.month != mes_num_filtro or f.year != año_filtro:
+                        return hoy.date() if hoy.month == mes_num_filtro else primer_dia
+                    return f
+                except:
                     return hoy.date() if hoy.month == mes_num_filtro else primer_dia
-                return f
 
             df_proyeccion['Fecha_Curva'] = df_proyeccion.apply(asignar_fecha_curva, axis=1)
             df_proyeccion['Es_Hecho'] = df_proyeccion['Estado_Taller'].str.contains('ENTREGADO|TERM', na=False) | (df_proyeccion['Estado_Resumen'] == 'Facturado (FAC)')
 
-            agrupado = df_proyeccion.groupby('Fecha_Curva').agg(Paños_Esperados=('Paños', 'sum')).reset_index()
-            agrupado_hecho = df_proyeccion[df_proyeccion['Es_Hecho']].groupby('Fecha_Curva').agg(Paños_Hechos=('Paños', 'sum')).reset_index()
+            agrupado = df_proyeccion.groupby('Fecha_Curva').agg(Paños_Esperados=('Paños', 'sum')).reset_index() if 'Paños' in df_proyeccion else pd.DataFrame(columns=['Fecha_Curva', 'Paños_Esperados'])
+            agrupado_hecho = df_proyeccion[df_proyeccion['Es_Hecho']].groupby('Fecha_Curva').agg(Paños_Hechos=('Paños', 'sum')).reset_index() if 'Paños' in df_proyeccion else pd.DataFrame(columns=['Fecha_Curva', 'Paños_Hechos'])
 
             df_habiles = df_habiles.merge(agrupado, left_on='Fecha', right_on='Fecha_Curva', how='left').fillna(0)
             df_habiles = df_habiles.merge(agrupado_hecho, left_on='Fecha', right_on='Fecha_Curva', how='left').fillna(0)
 
-            df_habiles['1. Proyección Esperada (SI+FAC)'] = df_habiles['Paños_Esperados'].cumsum()
-            df_habiles['2. Avance Real Hecho'] = df_habiles['Paños_Hechos'].cumsum()
+            df_habiles['1. Proyección Esperada (SI+FAC)'] = df_habiles['Paños_Esperados'].cumsum() if 'Paños_Esperados' in df_habiles else 0
+            df_habiles['2. Avance Real Hecho'] = df_habiles['Paños_Hechos'].cumsum() if 'Paños_Hechos' in df_habiles else 0
             df_habiles.loc[df_habiles['Fecha'] > hoy.date(), '2. Avance Real Hecho'] = None
 
             fig = go.Figure()
@@ -1317,7 +1327,7 @@ with tab_fac:
             fig.update_layout(title="Curva de Acumulación de Trabajo", xaxis_title="Días Hábiles", yaxis_title="Cantidad de Paños", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), hovermode="x unified")
             st.plotly_chart(fig, use_container_width=True)
 
-        # --- ANÁLISIS DETALLADO (ESTILO JUJUY PARA SALTA) ---
+        # --- ANÁLISIS DETALLADO ---
         st.write("### 📊 Análisis de Producción Detallado")
 
         def crear_tabla_resumen(df_origen, columna_indice):
@@ -1346,48 +1356,20 @@ with tab_fac:
         dict_formato_tablas.update({c: "{:.1f}" for c in ['📦 FAC', '📦 SI', '📦 TOTAL (FAC+SI)']})
 
         with tab_asesores:
-            df_asesores_limpio = df_analisis[df_analisis['Asesor'].str.strip() != ''].copy()
-            df_asesores_limpio = df_asesores_limpio[~df_asesores_limpio['Asesor'].str.contains("NAN|SIN ASIGNAR", na=False)]
+            if 'Asesor' in df_analisis.columns:
+                df_asesores_limpio = df_analisis[df_analisis['Asesor'].astype(str).str.strip() != ''].copy()
+                df_asesores_limpio = df_asesores_limpio[~df_asesores_limpio['Asesor'].astype(str).str.contains("NAN|SIN ASIGNAR", na=False)]
 
-            tabla_asesor = crear_tabla_resumen(df_asesores_limpio, 'Asesor')
-
-            df_a_panos_chart = tabla_asesor.reset_index()[['Asesor', '📦 FAC', '📦 SI', '📦 TOTAL (FAC+SI)']].melt(id_vars='Asesor', var_name='Métrica', value_name='Paños')
-            df_a_panos_chart['Métrica'] = df_a_panos_chart['Métrica'].replace({'📦 FAC': 'Facturado', '📦 SI': 'Aprobado (SI)', '📦 TOTAL (FAC+SI)': 'Total Proyectado'})
-
-            df_a_pesos_chart = tabla_asesor.reset_index()[['Asesor', '💰 FAC (M.O.)', '💰 SI (M.O.)', '💰 TOTAL (M.O.)']].melt(id_vars='Asesor', var_name='Métrica', value_name='Precio')
-            df_a_pesos_chart['Métrica'] = df_a_pesos_chart['Métrica'].replace({'💰 FAC (M.O.)': 'Facturado', '💰 SI (M.O.)': 'Aprobado (SI)', '💰 TOTAL (M.O.)': 'Total Proyectado'})
-
-            col_a_g1, col_a_g2 = st.columns(2)
-            with col_a_g1:
-                fig_a_panos = px.bar(df_a_panos_chart, x='Asesor', y='Paños', color='Métrica', barmode='group', text_auto='.1f', title='📦 Paños por Asesor', color_discrete_map=colores_grafico)
-                fig_a_panos.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), legend_title_text='')
-                st.plotly_chart(fig_a_panos, use_container_width=True)
-            with col_a_g2:
-                fig_a_pesos = px.bar(df_a_pesos_chart, x='Asesor', y='Precio', color='Métrica', barmode='group', text_auto='$.2s', title='💰 Montos (M.O.) por Asesor', color_discrete_map=colores_grafico)
-                fig_a_pesos.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), legend_title_text='')
-                st.plotly_chart(fig_a_pesos, use_container_width=True)
-
-            col_a_p1, col_a_p2 = st.columns(2)
-            df_pie_a = tabla_asesor.reset_index()
-            with col_a_p1:
-                df_panos_pie_a = df_pie_a[df_pie_a['📦 TOTAL (FAC+SI)'] > 0]
-                if not df_panos_pie_a.empty: st.plotly_chart(px.pie(df_panos_pie_a, values='📦 TOTAL (FAC+SI)', names='Asesor', hole=0.4, title='Distribución de Paños Totales'), use_container_width=True)
-            with col_a_p2:
-                df_pesos_pie_a = df_pie_a[df_pie_a['💰 TOTAL (M.O.)'] > 0]
-                if not df_pesos_pie_a.empty: st.plotly_chart(px.pie(df_pesos_pie_a, values='💰 TOTAL (M.O.)', names='Asesor', hole=0.4, title='Distribución de Ingresos (M.O.)'), use_container_width=True)
-
-            st.dataframe(tabla_asesor.style.format(dict_formato_tablas), use_container_width=True)
+                tabla_asesor = crear_tabla_resumen(df_asesores_limpio, 'Asesor')
+                st.dataframe(tabla_asesor.style.format(dict_formato_tablas), use_container_width=True)
 
         with tab_empresas:
-            col_e1, col_e2 = st.columns([1.5, 1])
-            with col_e1:
-                tabla_empresa = crear_tabla_resumen(df_analisis, 'Cliente')
-                st.dataframe(tabla_empresa.style.format(dict_formato_tablas), use_container_width=True)
-            with col_e2:
-                df_cierre = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])]
-                if not df_cierre.empty:
-                    res_empresa_pie = df_cierre.groupby('Cliente')[['Precio']].sum().reset_index()
-                    st.plotly_chart(px.pie(res_empresa_pie, values='Precio', names='Cliente', hole=0.4, title="Participación en la M.O. Proyectada ($)"), use_container_width=True)
+            if 'Cliente' in df_analisis.columns or 'EMPRESA' in df_analisis.columns:
+                col_empresa = 'Cliente' if 'Cliente' in df_analisis.columns else 'EMPRESA'
+                col_e1, col_e2 = st.columns([1.5, 1])
+                with col_e1:
+                    tabla_empresa = crear_tabla_resumen(df_analisis, col_empresa)
+                    st.dataframe(tabla_empresa.style.format(dict_formato_tablas), use_container_width=True)
 
         with tab_rep:
             st.write("**Detalle de Costos de Repuestos (FAC + SI)**")
@@ -1396,7 +1378,9 @@ with tab_fac:
                 df_rep_tab = df_rep_tab[df_rep_tab['PRECIO_LIMPIO'] > 0]
                 
                 if not df_rep_tab.empty:
-                    df_rep_disp = df_rep_tab[['PATENTE', 'ASESOR', 'PRECIO_LIMPIO', 'FAC']].sort_values('PRECIO_LIMPIO', ascending=False)
+                    cols_rep = ['PATENTE', 'ASESOR', 'PRECIO_LIMPIO', 'FAC']
+                    cols_rep = [c for c in cols_rep if c in df_rep_tab.columns]
+                    df_rep_disp = df_rep_tab[cols_rep].sort_values('PRECIO_LIMPIO', ascending=False)
                     st.dataframe(df_rep_disp, hide_index=True, use_container_width=True, column_config={"PRECIO_LIMPIO": st.column_config.NumberColumn("Monto Fac ($)", format="$ %d")})
                 else:
                     st.info("No hay repuestos facturados o aprobados en este período.")
@@ -1406,24 +1390,24 @@ with tab_fac:
         # --- AUDITORÍA DE DATOS ---
         st.divider()
         st.markdown("### 🚨 Auditoría de Carga (Detectores de Errores)")
-        st.write("Vehículos que requieren corrección manual en el Google Sheets por datos faltantes.")
+        
+        if 'Precio' in df.columns and 'Paños' in df.columns:
+            errores_precio = df[(df['Estado_Fac'].isin(['FAC', 'SI'])) & (df['Precio'] == 0)]
+            errores_panos = df[(~df['Estado_Taller'].str.contains("ENTREGADO", na=False)) & (df['Paños'] == 0)]
 
-        errores_precio = df[(df['Estado_Fac'].isin(['FAC', 'SI'])) & (df['Precio'] == 0)]
-        errores_panos = df[(~df['Estado_Taller'].str.contains("ENTREGADO", na=False)) & (df['Paños'] == 0)]
+            alertas = []
+            for _, row in errores_precio.iterrows():
+                alertas.append({"Dominio": row.get('Patente', ''), "Error": "💰 Falta M.O. en auto FAC/SI", "Asesor": row.get('Asesor', '')})
+            for _, row in errores_panos.iterrows():
+                alertas.append({"Dominio": row.get('Patente', ''), "Error": "📦 Faltan Paños en auto activo", "Asesor": row.get('Asesor', '')})
 
-        alertas = []
-        for _, row in errores_precio.iterrows():
-            alertas.append({"Dominio": row['Patente'], "Error": "💰 Falta M.O. en auto FAC/SI", "Asesor": row['Asesor']})
-        for _, row in errores_panos.iterrows():
-            alertas.append({"Dominio": row['Patente'], "Error": "📦 Faltan Paños en auto activo", "Asesor": row['Asesor']})
-
-        if alertas:
-            df_alertas = pd.DataFrame(alertas)
-            st.error(f"⚠️ Se detectaron {len(df_alertas)} errores de carga en la planilla.")
-            st.dataframe(df_alertas, hide_index=True, use_container_width=True)
-        else:
-            st.success("✅ ¡Planilla impecable! No se detectaron errores de carga de datos críticos.")
-
+            if alertas:
+                df_alertas = pd.DataFrame(alertas)
+                st.error(f"⚠️ Se detectaron {len(df_alertas)} errores de carga en la planilla.")
+                st.dataframe(df_alertas, hide_index=True, use_container_width=True)
+            else:
+                st.success("✅ ¡Planilla impecable! No se detectaron errores de carga de datos críticos.")
+                
 # ==========================================
 # PESTAÑA 5: KPIs
 # ==========================================
