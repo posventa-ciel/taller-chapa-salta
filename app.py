@@ -20,19 +20,34 @@ try:
     # 1. Traemos la pestaña principal
     hoja = planilla.worksheet("TURNOS")
     
-    # 2. Traemos la pestaña de Repuestos con un detector de pestañas
-    try:
-        hoja_repuestos = planilla.worksheet("REPUESTOS")
-    except gspread.exceptions.WorksheetNotFound:
-        # Si no la encuentra, le pedimos que nos diga qué pestañas ve
-        nombres_hojas = [ws.title for ws in planilla.worksheets()]
-        st.error(f"❌ La app no encuentra la pestaña 'REPUESTOS'. Las pestañas que la app está viendo ahora mismo son: {nombres_hojas}. ¡Probá borrando la caché de Streamlit!")
-        hoja_repuestos = None
+    # 2. Traemos la pestaña de Repuestos
+    hoja_repuestos = planilla.worksheet("REPUESTOS")
         
 except Exception as e:
     st.error(f"Error de conexión a Google Sheets: {e}")
     hoja = None
     hoja_repuestos = None
+
+# --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
+# 1. Convertimos la pestaña TURNOS a la variable 'df' para el resto de la app
+if hoja is not None:
+    try:
+        df = pd.DataFrame(hoja.get_all_records())
+    except Exception as e:
+        st.warning(f"Error al convertir TURNOS: {e}")
+        df = pd.DataFrame()
+else:
+    df = pd.DataFrame()
+
+# 2. Convertimos la pestaña REPUESTOS a la variable 'df_repuestos'
+if hoja_repuestos is not None:
+    try:
+        df_repuestos = pd.DataFrame(hoja_repuestos.get_all_records())
+    except Exception as e:
+        st.warning(f"Error al convertir los datos de REPUESTOS: {e}")
+        df_repuestos = pd.DataFrame()
+else:
+    df_repuestos = pd.DataFrame()
 
 # --- CONVERSIÓN A TABLAS (DATAFRAMES) ---
 if hoja_repuestos is not None:
