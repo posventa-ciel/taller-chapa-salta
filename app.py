@@ -204,10 +204,39 @@ def obtener_proxima_fecha_libre(dias_carga):
             dias_agregados += 1
     return f"{DIAS_SEMANA[fecha.weekday()]} {fecha.strftime('%d/%m')}"
 
-# =====================================================================
-# ⚠️ [AQUÍ DEBE ESTAR TU FUNCIÓN obtener_turnos()] ⚠️
-# Asegurate de que def obtener_turnos(): siga existiendo en esta parte
-# =====================================================================
+@st.cache_data(ttl=300)
+def obtener_turnos():
+    columnas_base = ['Estado_Turno', 'Fecha', 'Hora', 'Vehiculo', 'Patente', 'Asesor', 'Precio', 'Paños', 'Observaciones', 'Tiempo', 'Cliente', 'Seguro', 'Ticket', 'Recibido', 'Fotos', 'Referencia', 'Motivo_Cancelacion']
+    try:
+        if hoja is None:
+            return pd.DataFrame(columns=columnas_base)
+        
+        datos = hoja.get_all_values()
+        if len(datos) <= 1:
+            return pd.DataFrame(columns=columnas_base)
+            
+        # La primera fila son los títulos en Sheets
+        df_t = pd.DataFrame(datos[1:], columns=datos[0])
+        
+        # Limpieza y armado de columnas que usa el Kanban y la tabla
+        df_t['Fecha'] = pd.to_datetime(df_t.iloc[:, 1], format='%d/%m/%Y', errors='coerce').dt.date
+        df_t['Cancelado'] = df_t.iloc[:, 0].astype(str).str.upper() == 'C'
+        df_t['Tipo'] = df_t.iloc[:, 0].apply(lambda x: '🚶‍♂️ SIN TURNO' if str(x).upper() == 'N' else '📅 PROGRAMADO')
+        
+        # Casillas de verificación (Checkboxes)
+        df_t['Recibido'] = df_t.get('Recibido', pd.Series(dtype=str)).astype(str).str.upper() == 'SI'
+        df_t['Fotos'] = df_t.get('Fotos', pd.Series(dtype=str)).astype(str).str.upper() == 'SI'
+        
+        # Nos aseguramos de que existan estas columnas para que no rompa la tabla de edición
+        for col in ['Ticket', 'Referencia', 'Observaciones', 'Asesor', 'Cliente', 'Vehiculo', 'Patente', 'Motivo_Cancelacion']:
+            if col not in df_t.columns:
+                df_t[col] = ""
+                
+        return df_t
+        
+    except Exception as e:
+        print(f"Error cargando turnos: {e}")
+        return pd.DataFrame(columns=columnas_base)
 
 @st.cache_data(ttl=300)
 def obtener_datos_maestros():
