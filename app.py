@@ -613,7 +613,9 @@ with tab_turnos:
         st.markdown("<h2 style='color: #00235d; margin-top: 0;'>📥 1. INGRESOS: Recepción de Vehículos</h2>", unsafe_allow_html=True)
         st.write("Administración de turnos y vehículos programados para **entrar** al taller en las fechas seleccionadas.")
         
-        mask = (df_turnos_display['Fecha'] >= f_inicio) & (df_turnos_display['Fecha'] <= f_fin)
+        # Conversión segura para evitar errores con celdas vacías
+        fechas_turnos_dt = pd.to_datetime(df_turnos_display['Fecha'], errors='coerce')
+        mask = (fechas_turnos_dt >= pd.to_datetime(f_inicio)) & (fechas_turnos_dt <= pd.to_datetime(f_fin))
         df_rango = df_turnos_display[mask].copy()
         if asesor_filtro != "TODOS": df_rango = df_rango[df_rango['Asesor'] == asesor_filtro]
 
