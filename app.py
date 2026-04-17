@@ -769,8 +769,10 @@ with tab_turnos:
             df_no_entregados = df_no_entregados[~df_no_entregados['Patente'].isin(st.session_state.entregas_confirmadas)]
             df_no_entregados['Entregado_OK'] = False
             
-            entregas_rango = df_no_entregados[(df_no_entregados['Fecha_Promesa_Disp'] >= f_inicio) & (df_no_entregados['Fecha_Promesa_Disp'] <= f_fin)].copy()
-            entregas_atrasadas = df_no_entregados[(df_no_entregados['Fecha_Promesa_Disp'].notna()) & (df_no_entregados['Fecha_Promesa_Disp'] < hoy.date())].copy()
+            # Conversión segura para fechas de promesa
+            fechas_prom_dt = pd.to_datetime(df_no_entregados['Fecha_Promesa_Disp'], errors='coerce')
+            entregas_rango = df_no_entregados[(fechas_prom_dt >= pd.to_datetime(f_inicio)) & (fechas_prom_dt <= pd.to_datetime(f_fin))].copy()
+            entregas_atrasadas = df_no_entregados[(fechas_prom_dt.notna()) & (fechas_prom_dt < pd.to_datetime(hoy.date()))].copy()
             
             if asesor_filtro != "TODOS":
                 entregas_rango = entregas_rango[entregas_rango['Asesor'] == asesor_filtro]
