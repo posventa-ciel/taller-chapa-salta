@@ -80,22 +80,40 @@ if hoja is not None:
 else:
     df = pd.DataFrame()
 
-# --- CONVERSIÓN DE REPUESTOS ---
-if hoja_repuestos is not None:
+# --- CARGA INSTANTÁNEA (REPUESTOS Y TERCEROS) ---
+def cargar_hoja_directa(hoja_gs, nombre_grupo):
     try:
-        datos_repuestos = hoja_repuestos.get_all_values()
-        if datos_repuestos:
-            df_repuestos = pd.DataFrame(datos_repuestos[1:], columns=datos_repuestos[0])
-            df_repuestos.columns = [str(c).upper().strip() for c in df_repuestos.columns]
-            
-            # Limpiamos también las fechas de repuestos
-            if 'FECHA TALLER' in df_repuestos.columns:
-                df_repuestos['FECHA_DT'] = df_repuestos['FECHA TALLER'].apply(limpiar_fecha_ar)
-        else:
-            df_repuestos = pd.DataFrame()
-    except Exception as e:
-        st.warning(f"Error al convertir los datos de REPUESTOS: {e}")
-        df_repuestos = pd.DataFrame()
+        datos = hoja_gs.get_all_values()
+        if not datos: return pd.DataFrame()
+        
+        # Buscamos la fila de títulos (la primera que tenga algo de texto)
+        idx = 0
+        for i, fila in enumerate(datos):
+            if any(str(c).strip() for c in fila):
+                idx = i
+                break
+        
+        df_res = pd.DataFrame(datos[idx+1:], columns=datos[idx])
+        df_res.columns = [str(c).upper().strip() for c in df_res.columns]
+        df_res['GRUPO'] = nombre_grupo # Forzamos el nombre del grupo
+        return df_res
+    except:
+        return pd.DataFrame()
+
+if hoja_repuestos:
+    df_repuestos = cargar_hoja_directa(hoja_repuestos, "REPUESTOS")
+    if not df_repuestos.empty and 'FECHA TALLER' in df_repuestos.columns:
+        df_repuestos['FECHA_DT'] = df_repuestos['FECHA TALLER'].apply(limpiar_fecha_ar)
+
+if hoja_terceros:
+    df_terceros_data = cargar_hoja_directa(hoja_terceros, "TERCEROS")
+    # Limpieza de montos y fechas para Terceros
+    if not df_terceros_data.empty:
+        for col in ['PRECIO', 'COSTO', 'PAÑOS']:
+            if col in df_terceros_data.columns:
+                df_terceros_data[col] = df_terceros_data[col].apply(limpiar_plata_general)
+        if 'FECHA PROM' in df_terceros_data.columns:
+            df_terceros_data['FECHA_DT'] = df_terceros_data['FECHA PROM'].apply(limpiar_fecha_ar)
     
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Gestión Taller CENOA - Salta", layout="wide", initial_sidebar_state="expanded")
