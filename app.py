@@ -1149,7 +1149,7 @@ with tab_portal:
 # ==========================================
 with tab_fac:
     if not df.empty:
-        st.subheader("🎯 Análisis de Facturación, Paños y Objetivos (PROPIOS)")
+        st.subheader("🎯 Análisis de Facturación, Paños y Objetivos")
 
         df_analisis = df.copy()
 
@@ -1229,7 +1229,7 @@ with tab_fac:
         panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est_prop)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
 
-        st.markdown("### 🎯 Control de Objetivo Mensual (Solo Paños Propios)")
+        st.markdown("### 🎯 Control de Objetivo Mensual")
         c_obj1, c_obj2 = st.columns([3, 1])
         with c_obj1:
             st.progress(int(porcentaje_logro))
