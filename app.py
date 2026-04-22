@@ -1382,15 +1382,9 @@ with tab_fac:
 
         st.markdown("<br>", unsafe_allow_html=True)
         
-        # --- EL CARTELOTE DEL GRAN TOTAL ---
+        # --- EL TOTAL SUTIL ---
         gran_total_general = panos_est_prop + tot_ter_panos
-        st.markdown(f"""
-        <div style="background-color: #00235d; padding: 20px; border-radius: 10px; text-align: center; color: white; margin-top: 10px;">
-            <h4 style="color: #00A8E8; margin: 0; text-transform: uppercase;">Gran Total de Producción (Propios + Terceros)</h4>
-            <h1 style="font-size: 3rem; margin: 10px 0;">📦 {gran_total_general:.1f} Paños</h1>
-            <p style="margin: 0; font-size: 1.1rem;">({panos_est_prop:.1f} Propios  |  {tot_ter_panos:.1f} Terceros)</p>
-        </div>
-        """, unsafe_allow_html=True)
+        st.write(f"📈 **Gran Total de Producción Física (Propios + Terceros):** {gran_total_general:.1f} Paños")
 
         # --- AUDITORÍA DE DATOS DETALLADA (Con exclusión de Repuestos) ---
         st.divider()
