@@ -1245,6 +1245,37 @@ with tab_fac:
         c_r3.markdown(f'<div class="metric-card" style="border-left: 5px solid #00235d;"><div class="metric-title" style="color:#00235d;">Estimado a Cierre de Mes</div><div class="metric-value-money" style="color:#00235d;">{formato_pesos(pesos_est)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo + si_mo)} | Rep: {formato_pesos(fac_rep + si_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; color:#00235d; font-weight: bold; margin-top: 8px;">📦 {panos_est_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
+        
+        # ==========================================
+        # --- GESTIÓN DE TERCEROS Y GRAN TOTAL ---
+        # ==========================================
+        st.divider()
+        st.markdown("### 🤝 Gestión Financiera de Terceros")
+        df_terceros_cerrados = df_terceros[df_terceros['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+        
+        tot_ter_panos = 0
+        if not df_terceros_cerrados.empty:
+            df_terceros_cerrados['Precio_Limpio'] = df_terceros_cerrados[col_precio].apply(limpiar_plata_general)
+            df_terceros_cerrados['Costo_Limpio'] = df_terceros_cerrados[col_costo].apply(limpiar_plata_general)
+            
+            tot_ter_fac = df_terceros_cerrados['Precio_Limpio'].sum()
+            tot_ter_costo = df_terceros_cerrados['Costo_Limpio'].sum()
+            tot_ter_margen = tot_ter_fac - tot_ter_costo
+            tot_ter_panos = df_terceros_cerrados[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
+            
+            c_t1, c_t2, c_t3, c_t4 = st.columns(4)
+            c_t1.markdown(f'<div class="metric-card"><div class="metric-title">Total Venta (Terceros)</div><div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div></div>', unsafe_allow_html=True)
+            c_t2.markdown(f'<div class="metric-card"><div class="metric-title">Costo Total</div><div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div></div>', unsafe_allow_html=True)
+            c_t3.markdown(f'<div class="metric-card"><div class="metric-title">Margen de Ganancia</div><div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div></div>', unsafe_allow_html=True)
+            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños de Terceros</div><div class="metric-value-number" style="font-size: 1.5rem; color:#6f42c1;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
+        else:
+            st.info("No hay datos de Terceros en estado Facturado o Aprobado para el período seleccionado.")
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- EL TOTAL SUTIL ---
+        gran_total_general = panos_est_prop + tot_ter_panos
+        st.write(f"📈 **Gran Total de Producción Física (Propios + Terceros):** {gran_total_general:.1f} Paños")
 
         with st.expander("🔍 Radiografía del Aprobado Propios (¿Dónde está la plata del 'SI'?)", expanded=True):
             df_si_detail = df_si_prop.copy()
@@ -1397,37 +1428,6 @@ with tab_fac:
                     st.info("No hay repuestos facturados o aprobados en este período.")
             except:
                 st.info("Conectá correctamente la pestaña de REPUESTOS para ver el detalle.")
-
-        # ==========================================
-        # --- GESTIÓN DE TERCEROS Y GRAN TOTAL ---
-        # ==========================================
-        st.divider()
-        st.markdown("### 🤝 Gestión Financiera de Terceros")
-        df_terceros_cerrados = df_terceros[df_terceros['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
-        
-        tot_ter_panos = 0
-        if not df_terceros_cerrados.empty:
-            df_terceros_cerrados['Precio_Limpio'] = df_terceros_cerrados[col_precio].apply(limpiar_plata_general)
-            df_terceros_cerrados['Costo_Limpio'] = df_terceros_cerrados[col_costo].apply(limpiar_plata_general)
-            
-            tot_ter_fac = df_terceros_cerrados['Precio_Limpio'].sum()
-            tot_ter_costo = df_terceros_cerrados['Costo_Limpio'].sum()
-            tot_ter_margen = tot_ter_fac - tot_ter_costo
-            tot_ter_panos = df_terceros_cerrados[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
-            
-            c_t1, c_t2, c_t3, c_t4 = st.columns(4)
-            c_t1.markdown(f'<div class="metric-card"><div class="metric-title">Total Venta (Terceros)</div><div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div></div>', unsafe_allow_html=True)
-            c_t2.markdown(f'<div class="metric-card"><div class="metric-title">Costo Total</div><div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div></div>', unsafe_allow_html=True)
-            c_t3.markdown(f'<div class="metric-card"><div class="metric-title">Margen de Ganancia</div><div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div></div>', unsafe_allow_html=True)
-            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños de Terceros</div><div class="metric-value-number" style="font-size: 1.5rem; color:#6f42c1;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
-        else:
-            st.info("No hay datos de Terceros en estado Facturado o Aprobado para el período seleccionado.")
-
-        st.markdown("<br>", unsafe_allow_html=True)
-        
-        # --- EL TOTAL SUTIL ---
-        gran_total_general = panos_est_prop + tot_ter_panos
-        st.write(f"📈 **Gran Total de Producción Física (Propios + Terceros):** {gran_total_general:.1f} Paños")
 
         # --- AUDITORÍA DE DATOS DETALLADA (Con exclusión de Repuestos) ---
         st.divider()
