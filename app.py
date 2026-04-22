@@ -1100,12 +1100,13 @@ with tab_portal:
             st.write("#### 🚚 Vehículos Entregados (Historial Reciente)")
             st.dataframe(df_entregados, hide_index=True, use_container_width=True, column_config={"Observaciones": st.column_config.TextColumn("Observaciones", width="large")})
         else: st.info("No hay vehículos registrados para las empresas del grupo en este momento.")
+
 # ==========================================
 # PESTAÑA 4: FACTURACIÓN Y OBJETIVOS
 # ==========================================
 with tab_fac:
     if not df.empty:
-        st.subheader("🎯 Análisis de Facturación, Paños y Objetivos")
+        st.subheader("🎯 Análisis de Facturación, Paños y Objetivos (PROPIOS)")
 
         df_analisis = df.copy()
 
@@ -1145,12 +1146,19 @@ with tab_fac:
 
         df_analisis['Estado_Resumen'] = df_analisis.apply(clasificar_estado, axis=1)
 
-        df_fac = df_analisis[df_analisis['Estado_Resumen'] == 'Facturado (FAC)']
-        df_si = df_analisis[df_analisis['Estado_Resumen'] == 'Aprobado (SI)']
+        # ==========================================
+        # 🚨 CIRUGÍA MAYOR: SEPARAMOS PROPIOS DE TERCEROS
+        # ==========================================
+        df_propios = df_analisis[df_analisis['Grupo'].astype(str).str.upper() != 'TERCEROS'].copy()
+        df_terceros = df_analisis[df_analisis['Grupo'].astype(str).str.upper() == 'TERCEROS'].copy()
 
-        # --- 2. CÁLCULOS SEPARADOS Y DESCUENTO DE M.O. ---
-        fac_mo_bruto = df_fac[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_fac else 0
-        si_mo_bruto = df_si[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_si else 0
+        # Todo el análisis principal ahora se hace SOLO sobre los Propios
+        df_fac_prop = df_propios[df_propios['Estado_Resumen'] == 'Facturado (FAC)']
+        df_si_prop = df_propios[df_propios['Estado_Resumen'] == 'Aprobado (SI)']
+
+        # --- 2. CÁLCULOS SEPARADOS Y DESCUENTO DE M.O. (SOLO PROPIOS) ---
+        fac_mo_bruto = df_fac_prop[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_fac_prop else 0
+        si_mo_bruto = df_si_prop[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_si_prop else 0
 
         try:
             df_rep = df_repuestos.copy()
@@ -1168,34 +1176,35 @@ with tab_fac:
         pesos_fac, pesos_si = fac_mo + fac_rep, si_mo + si_rep
         pesos_est = pesos_fac + pesos_si
 
-        panos_fac = df_fac[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum() if col_panos in df_fac else 0
-        panos_si = df_si[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum() if col_panos in df_si else 0
-        panos_est = panos_fac + panos_si
+        panos_fac_prop = df_fac_prop[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum() if col_panos in df_fac_prop else 0
+        panos_si_prop = df_si_prop[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum() if col_panos in df_si_prop else 0
+        panos_est_prop = panos_fac_prop + panos_si_prop
 
-        porcentaje_logro = min((panos_est / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
+        # --- 3. CÁLCULOS DE OBJETIVOS (SOLO CON PAÑOS PROPIOS) ---
+        porcentaje_logro = min((panos_est_prop / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
         dias_restantes = dias_restantes_calc
-        panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est)
+        panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est_prop)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
 
-        st.markdown("### 🎯 Control de Objetivo Mensual y Ritmo")
+        st.markdown("### 🎯 Control de Objetivo Mensual (Solo Paños Propios)")
         c_obj1, c_obj2 = st.columns([3, 1])
         with c_obj1:
             st.progress(int(porcentaje_logro))
-            st.caption(f"**Progreso del Mes:** {panos_est:.1f} paños asegurados de un objetivo de {OBJETIVO_MENSUAL_PANOS} paños.")
+            st.caption(f"**Progreso del Mes:** {panos_est_prop:.1f} paños propios de un objetivo de {OBJETIVO_MENSUAL_PANOS} paños.")
         with c_obj2:
             st.markdown(f"<h3 style='text-align: right; color: {'#28a745' if porcentaje_logro >= 95 else '#ffc107' if porcentaje_logro >= 75 else '#dc3545'}; margin-top: 0;'>{porcentaje_logro:.1f}%</h3>", unsafe_allow_html=True)
-        st.info(f"⏱️ **Termómetro de Ritmo:** Faltan **{panos_faltantes:.1f} paños** y quedan **{dias_restantes} días hábiles**. Para llegar a la meta, el taller debe sacar a la calle **{ritmo_diario_necesario:.1f} paños por día** de acá a fin de mes.")
+        st.info(f"⏱️ **Termómetro de Ritmo:** Faltan **{panos_faltantes:.1f} paños propios** y quedan **{dias_restantes} días hábiles**. Para llegar a la meta, el taller interno debe sacar **{ritmo_diario_necesario:.1f} paños por día**.")
 
-        st.write("### 💰 Rendimiento y Proyección al Cierre")
+        st.write("### 💰 Rendimiento y Proyección al Cierre (Producción Interna)")
         c_r1, c_r2, c_r3 = st.columns(3)
-        c_r1.markdown(f'<div class="metric-card" style="border-left: 5px solid #28a745;"><div class="metric-title" style="color: #28a745;">Facturado Actual (FAC)</div><div class="metric-value-money" style="color: #28a745;">{formato_pesos(pesos_fac)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo)} | Rep: {formato_pesos(fac_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; margin-top: 8px;">📦 {panos_fac:.1f} paños</div></div>', unsafe_allow_html=True)
-        c_r2.markdown(f'<div class="metric-card" style="border-left: 5px solid #17a2b8;"><div class="metric-title" style="color: #17a2b8;">Aprobado (SI)</div><div class="metric-value-money" style="color:#17a2b8;">{formato_pesos(pesos_si)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(si_mo)} | Rep: {formato_pesos(si_rep)}</div><div class="metric-subtitle-green" style="font-size: 1.1rem; color: #17a2b8; margin-top: 8px;">📦 {panos_si:.1f} paños</div></div>', unsafe_allow_html=True)
-        c_r3.markdown(f'<div class="metric-card" style="border-left: 5px solid #00235d;"><div class="metric-title" style="color:#00235d;">Estimado a Cierre de Mes</div><div class="metric-value-money" style="color:#00235d;">{formato_pesos(pesos_est)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo + si_mo)} | Rep: {formato_pesos(fac_rep + si_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; color:#00235d; font-weight: bold; margin-top: 8px;">📦 {panos_est:.1f} paños totales</div></div>', unsafe_allow_html=True)
+        c_r1.markdown(f'<div class="metric-card" style="border-left: 5px solid #28a745;"><div class="metric-title" style="color: #28a745;">Facturado Actual (FAC)</div><div class="metric-value-money" style="color: #28a745;">{formato_pesos(pesos_fac)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo)} | Rep: {formato_pesos(fac_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; margin-top: 8px;">📦 {panos_fac_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
+        c_r2.markdown(f'<div class="metric-card" style="border-left: 5px solid #17a2b8;"><div class="metric-title" style="color: #17a2b8;">Aprobado (SI)</div><div class="metric-value-money" style="color:#17a2b8;">{formato_pesos(pesos_si)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(si_mo)} | Rep: {formato_pesos(si_rep)}</div><div class="metric-subtitle-green" style="font-size: 1.1rem; color: #17a2b8; margin-top: 8px;">📦 {panos_si_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
+        c_r3.markdown(f'<div class="metric-card" style="border-left: 5px solid #00235d;"><div class="metric-title" style="color:#00235d;">Estimado a Cierre de Mes</div><div class="metric-value-money" style="color:#00235d;">{formato_pesos(pesos_est)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo + si_mo)} | Rep: {formato_pesos(fac_rep + si_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; color:#00235d; font-weight: bold; margin-top: 8px;">📦 {panos_est_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
 
         st.markdown("<br>", unsafe_allow_html=True)
 
-        with st.expander("🔍 Radiografía del Aprobado (¿Dónde está la plata del 'SI'?)", expanded=True):
-            df_si_detail = df_si.copy()
+        with st.expander("🔍 Radiografía del Aprobado Propios (¿Dónde está la plata del 'SI'?)", expanded=True):
+            df_si_detail = df_si_prop.copy()
             def status_si(row):
                 est = str(row.get(col_est_taller, '')).upper()
                 f_prom = row.get('Fecha_Real_Dt')
@@ -1212,9 +1221,9 @@ with tab_fac:
 
         st.divider()
 
-        # --- CURVAS (Mantenido Igual) ---
+        # --- CURVAS (Construidas SOLO con producción propia) ---
         if mes_filtro != "TODOS":
-            st.markdown("### 📈 Curva de Producción y Facturación del Mes")
+            st.markdown("### 📈 Curva de Producción y Facturación del Mes (Producción Propia)")
             primer_dia = date(año_filtro, mes_num_filtro, 1)
             _, ult_dia = calendar.monthrange(año_filtro, mes_num_filtro)
             fechas_mes = [date(año_filtro, mes_num_filtro, d) for d in range(1, ult_dia + 1)]
@@ -1225,7 +1234,7 @@ with tab_fac:
             df_habiles['Dia_Habil_Num'] = range(1, len(df_habiles) + 1)
             df_habiles['Meta Lineal (Paños)'] = df_habiles['Dia_Habil_Num'] * CAPACIDAD_DIARIA_TALLER
 
-            df_proyeccion = df_analisis[df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
+            df_proyeccion = df_propios[df_propios['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
 
             def asignar_fecha_curva(row):
                 f = row['Fecha_Real_Dt']
@@ -1250,12 +1259,12 @@ with tab_fac:
             fig.add_trace(go.Scatter(x=df_habiles['Fecha'], y=df_habiles['1. Proyección Esperada (SI+FAC)'], name='Proyección Ideal', mode='lines+markers', line=dict(color='#00A8E8', width=2)))
             fig.add_trace(go.Scatter(x=df_habiles['Fecha'], y=df_habiles['2. Avance Real Hecho'], name='Avance Real', mode='lines+markers', line=dict(color='#28a745', width=4)))
 
-            fig.update_layout(title="Curva de Acumulación de Trabajo", xaxis_title="Días Hábiles", yaxis_title="Cantidad de Paños", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
+            fig.update_layout(title="Curva de Acumulación de Trabajo (Solo Propios)", xaxis_title="Días Hábiles", yaxis_title="Cantidad de Paños", legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1))
             st.plotly_chart(fig, use_container_width=True)
 
         st.divider()
 
-        # --- ANÁLISIS DETALLADO ESTILO JUJUY (Con Gráficos y Tortas) ---
+        # --- ANÁLISIS DETALLADO ESTILO JUJUY ---
         st.write("### 📊 Análisis de Producción Detallado")
 
         def crear_tabla_resumen(df_origen, columna_indice):
@@ -1286,14 +1295,12 @@ with tab_fac:
         tab_grupos, tab_asesores, tab_empresas, tab_rep = st.tabs(["👥 Producción por Grupo", "👔 Producción por Asesor", "🏢 Estimado Cierre por Empresa", "⚙️ Repuestos"])
 
         def render_graficos_y_tabla(tabla_resumen, col_agrupador, titulo_panos, titulo_plata):
-            # Preparar DataFrames para Gráficos de Barras
             df_panos_chart = tabla_resumen.reset_index()[[col_agrupador, '📦 FAC', '📦 SI', '📦 EST. CIERRE (FAC+SI)']].melt(id_vars=col_agrupador, var_name='Métrica', value_name='Paños')
             df_panos_chart['Métrica'] = df_panos_chart['Métrica'].replace({'📦 FAC': 'Facturado', '📦 SI': 'Aprobado (SI)', '📦 EST. CIERRE (FAC+SI)': 'Proyección al Cierre'})
             
             df_pesos_chart = tabla_resumen.reset_index()[[col_agrupador, '💰 FAC', '💰 SI', '💰 EST. CIERRE (FAC+SI)']].melt(id_vars=col_agrupador, var_name='Métrica', value_name='Precio')
             df_pesos_chart['Métrica'] = df_pesos_chart['Métrica'].replace({'💰 FAC': 'Facturado', '💰 SI': 'Aprobado (SI)', '💰 EST. CIERRE (FAC+SI)': 'Proyección al Cierre'})
 
-            # Mostrar Gráficos de Barras
             col_g1, col_g2 = st.columns(2)
             with col_g1:
                 fig_panos = px.bar(df_panos_chart, x=col_agrupador, y='Paños', color='Métrica', barmode='group', text_auto='.1f', title=titulo_panos, color_discrete_map=colores_grafico)
@@ -1304,7 +1311,6 @@ with tab_fac:
                 fig_pesos.update_layout(legend=dict(orientation="h", yanchor="bottom", y=1.02, xanchor="right", x=1), legend_title_text='')
                 st.plotly_chart(fig_pesos, use_container_width=True)
 
-            # Mostrar Gráficos de Torta (Pie Charts)
             col_p1, col_p2 = st.columns(2)
             df_pie = tabla_resumen.reset_index()
             with col_p1:
@@ -1314,25 +1320,25 @@ with tab_fac:
                 df_pesos_pie = df_pie[df_pie['💰 EST. CIERRE (FAC+SI)'] > 0]
                 if not df_pesos_pie.empty: st.plotly_chart(px.pie(df_pesos_pie, values='💰 EST. CIERRE (FAC+SI)', names=col_agrupador, hole=0.4, title='Distribución de Ingresos Totales ($)'), use_container_width=True)
 
-            # Mostrar Tabla con Formato
             dict_formato_tablas = {c: formato_pesos for c in tabla_resumen.columns if '💰' in c}
             dict_formato_tablas.update({c: "{:.1f}" for c in tabla_resumen.columns if '📦' in c})
             st.dataframe(tabla_resumen.style.format(dict_formato_tablas), use_container_width=True)
 
         with tab_grupos:
-            tabla_grupo = crear_tabla_resumen(df_analisis, 'Grupo')
-            render_graficos_y_tabla(tabla_grupo, 'Grupo', '📦 Paños por Grupo', '💰 Montos por Grupo')
+            # Mandamos df_propios en vez de df_analisis para no mezclar Terceros en las tablas
+            tabla_grupo = crear_tabla_resumen(df_propios, 'Grupo')
+            render_graficos_y_tabla(tabla_grupo, 'Grupo', '📦 Paños Propios por Grupo', '💰 Montos por Grupo')
 
         with tab_asesores:
-            if col_asesor in df_analisis.columns:
-                df_asesores_limpio = df_analisis[df_analisis[col_asesor].astype(str).str.strip().str.upper() != 'SIN ASIGNAR'].copy()
+            if col_asesor in df_propios.columns:
+                df_asesores_limpio = df_propios[df_propios[col_asesor].astype(str).str.strip().str.upper() != 'SIN ASIGNAR'].copy()
                 tabla_asesor = crear_tabla_resumen(df_asesores_limpio, col_asesor)
-                render_graficos_y_tabla(tabla_asesor, col_asesor, '📦 Paños por Asesor', '💰 Montos por Asesor')
+                render_graficos_y_tabla(tabla_asesor, col_asesor, '📦 Paños Propios por Asesor', '💰 Montos por Asesor')
 
         with tab_empresas:
-            if col_cliente in df_analisis.columns:
-                tabla_empresa = crear_tabla_resumen(df_analisis, col_cliente)
-                render_graficos_y_tabla(tabla_empresa, col_cliente, '📦 Paños por Empresa', '💰 Montos por Empresa')
+            if col_cliente in df_propios.columns:
+                tabla_empresa = crear_tabla_resumen(df_propios, col_cliente)
+                render_graficos_y_tabla(tabla_empresa, col_cliente, '📦 Paños Propios por Empresa', '💰 Montos por Empresa')
 
         with tab_rep:
             st.write("**Detalle de Costos de Repuestos (FAC + SI)**")
@@ -1349,29 +1355,43 @@ with tab_fac:
             except:
                 st.info("Conectá correctamente la pestaña de REPUESTOS para ver el detalle.")
 
-        # --- GESTIÓN DE TERCEROS ---
+        # ==========================================
+        # --- GESTIÓN DE TERCEROS Y GRAN TOTAL ---
+        # ==========================================
         st.divider()
         st.markdown("### 🤝 Gestión Financiera de Terceros")
-        df_terceros = df_analisis[(df_analisis['Grupo'] == 'TERCEROS') & (df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)']))].copy()
+        df_terceros_cerrados = df_terceros[df_terceros['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
         
-        if not df_terceros.empty:
-            # Limpiamos los números por las dudas para que no tire error al sumar
-            df_terceros['Precio_Limpio'] = df_terceros[col_precio].apply(limpiar_plata_general)
-            df_terceros['Costo_Limpio'] = df_terceros[col_costo].apply(limpiar_plata_general)
+        tot_ter_panos = 0
+        if not df_terceros_cerrados.empty:
+            df_terceros_cerrados['Precio_Limpio'] = df_terceros_cerrados[col_precio].apply(limpiar_plata_general)
+            df_terceros_cerrados['Costo_Limpio'] = df_terceros_cerrados[col_costo].apply(limpiar_plata_general)
             
-            tot_ter_fac = df_terceros['Precio_Limpio'].sum()
-            tot_ter_costo = df_terceros['Costo_Limpio'].sum()
+            tot_ter_fac = df_terceros_cerrados['Precio_Limpio'].sum()
+            tot_ter_costo = df_terceros_cerrados['Costo_Limpio'].sum()
             tot_ter_margen = tot_ter_fac - tot_ter_costo
-            tot_ter_panos = df_terceros[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
+            tot_ter_panos = df_terceros_cerrados[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
             
             c_t1, c_t2, c_t3, c_t4 = st.columns(4)
             c_t1.markdown(f'<div class="metric-card"><div class="metric-title">Total Venta (Terceros)</div><div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div></div>', unsafe_allow_html=True)
             c_t2.markdown(f'<div class="metric-card"><div class="metric-title">Costo Total</div><div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div></div>', unsafe_allow_html=True)
             c_t3.markdown(f'<div class="metric-card"><div class="metric-title">Margen de Ganancia</div><div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div></div>', unsafe_allow_html=True)
-            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños Asignados</div><div class="metric-value-number" style="font-size: 1.5rem;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
+            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños de Terceros</div><div class="metric-value-number" style="font-size: 1.5rem; color:#6f42c1;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
         else:
             st.info("No hay datos de Terceros en estado Facturado o Aprobado para el período seleccionado.")
-            
+
+        st.markdown("<br>", unsafe_allow_html=True)
+        
+        # --- EL CARTELOTE DEL GRAN TOTAL ---
+        gran_total_general = panos_est_prop + tot_ter_panos
+        st.markdown(f"""
+        <div style="background-color: #00235d; padding: 20px; border-radius: 10px; text-align: center; color: white; margin-top: 10px;">
+            <h4 style="color: #00A8E8; margin: 0; text-transform: uppercase;">Gran Total de Producción (Propios + Terceros)</h4>
+            <h1 style="font-size: 3rem; margin: 10px 0;">📦 {gran_total_general:.1f} Paños</h1>
+            <p style="margin: 0; font-size: 1.1rem;">({panos_est_prop:.1f} Propios  |  {tot_ter_panos:.1f} Terceros)</p>
+        </div>
+        """, unsafe_allow_html=True)
+
         # --- AUDITORÍA DE DATOS DETALLADA (Con exclusión de Repuestos) ---
         st.divider()
         st.markdown("### 🚨 Auditoría de Carga (Detectores de Errores)")
