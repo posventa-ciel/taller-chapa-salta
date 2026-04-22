@@ -49,12 +49,17 @@ def limpiar_fecha_ar(fecha_str):
     except:
         return pd.NaT
 
-# Función para limpiar plata y números (¡AHORA SÍ ESTÁ DEFINIDA ANTES DE USARLA!)
+# Función blindada para limpiar plata y números (Inmune a columnas duplicadas)
 def limpiar_plata_general(x):
-    if pd.isna(x): return 0.0
-    if isinstance(x, (int, float)): return float(x)
-    x = str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.') 
-    try: 
+    try:
+        # Si vienen datos duplicados juntos, agarramos solo el primero
+        if isinstance(x, pd.Series): 
+            x = x.iloc[0]
+            
+        if pd.isna(x) or str(x).strip() == '': return 0.0
+        if isinstance(x, (int, float)): return float(x)
+        
+        x = str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.') 
         return float(x)
     except: 
         return 0.0
@@ -89,13 +94,13 @@ if hoja is not None:
 else:
     df = pd.DataFrame()
 
-# --- CARGA INSTANTÁNEA (REPUESTOS Y TERCEROS) ---
+# --- CARGA INSTANTÁNEA BLINDADA (REPUESTOS Y TERCEROS) ---
 def cargar_hoja_directa(hoja_gs, nombre_grupo):
     try:
         datos = hoja_gs.get_all_values()
         if not datos: return pd.DataFrame()
         
-        # Buscamos la fila de títulos (la primera que tenga algo de texto)
+        # Buscamos la fila de títulos
         idx = 0
         for i, fila in enumerate(datos):
             if any(str(c).strip() for c in fila):
@@ -104,11 +109,16 @@ def cargar_hoja_directa(hoja_gs, nombre_grupo):
         
         df_res = pd.DataFrame(datos[idx+1:], columns=datos[idx])
         df_res.columns = [str(c).upper().strip() for c in df_res.columns]
-        df_res['GRUPO'] = nombre_grupo # Forzamos el nombre del grupo
+        
+        # 🚨 ELIMINAMOS COLUMNAS DUPLICADAS PARA EVITAR ERRORES
+        df_res = df_res.loc[:, ~df_res.columns.duplicated()]
+        
+        df_res['GRUPO'] = nombre_grupo 
         return df_res
     except:
         return pd.DataFrame()
 
+# Cargar Repuestos
 if hoja_repuestos:
     df_repuestos = cargar_hoja_directa(hoja_repuestos, "REPUESTOS")
     if not df_repuestos.empty:
@@ -117,16 +127,16 @@ if hoja_repuestos:
         if 'PRECIO' in df_repuestos.columns:
             df_repuestos['PRECIO_LIMPIO'] = df_repuestos['PRECIO'].apply(limpiar_plata_general)
 
+# Cargar Terceros
 if hoja_terceros:
     df_terceros_data = cargar_hoja_directa(hoja_terceros, "TERCEROS")
-    # Limpieza de montos y fechas para Terceros
     if not df_terceros_data.empty:
         for col in ['PRECIO', 'COSTO', 'PAÑOS']:
             if col in df_terceros_data.columns:
                 df_terceros_data[col] = df_terceros_data[col].apply(limpiar_plata_general)
         if 'FECHA PROM' in df_terceros_data.columns:
             df_terceros_data['FECHA_DT'] = df_terceros_data['FECHA PROM'].apply(limpiar_fecha_ar)
-    
+            
 # --- CONFIGURACIÓN DE PÁGINA ---
 st.set_page_config(page_title="Gestión Taller CENOA - Salta", layout="wide", initial_sidebar_state="expanded")
 
