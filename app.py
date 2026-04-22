@@ -22,6 +22,9 @@ try:
     
     # 2. Traemos la pestaña de Repuestos
     hoja_repuestos = planilla.worksheet("REPUESTOS")
+    
+    # 3. Traemos la pestaña de Terceros
+    hoja_terceros = planilla.worksheet("TERCEROS")
         
 except Exception as e:
     st.error(f"Error de conexión a Google Sheets: {e}")
