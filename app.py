@@ -30,8 +30,9 @@ except Exception as e:
     st.error(f"Error de conexión a Google Sheets: {e}")
     hoja = None
     hoja_repuestos = None
+    hoja_terceros = None
 
-# --- CONVERSIÓN Y LIMPIEZA INTEGRAL (PARA TODA LA APP) ---
+# --- FUNCIONES DE LIMPIEZA GLOBAL (PARA TODA LA APP) ---
 
 # Función para traducir fechas tipo "11-Mar" o "abr" al formato de Python
 def limpiar_fecha_ar(fecha_str):
@@ -48,17 +49,26 @@ def limpiar_fecha_ar(fecha_str):
     except:
         return pd.NaT
 
+# Función para limpiar plata y números (¡AHORA SÍ ESTÁ DEFINIDA ANTES DE USARLA!)
+def limpiar_plata_general(x):
+    if pd.isna(x): return 0.0
+    if isinstance(x, (int, float)): return float(x)
+    x = str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.') 
+    try: 
+        return float(x)
+    except: 
+        return 0.0
+
+# --- CARGA Y LIMPIEZA DE PESTAÑA PRINCIPAL (TURNOS) ---
 if hoja is not None:
     try:
         # 1. Leemos todo y lo pasamos a un DataFrame
         df = pd.DataFrame(hoja.get_all_records())
         
         # 2. Normalizamos nombres de columnas (Pasamos todo a MAYÚSCULAS y sin espacios)
-        # Esto hace que 'Fecha Prom', 'fecha prom' y 'FECHA PROM' sean lo mismo para la app
         df.columns = [str(c).upper().strip() for c in df.columns]
 
         # 3. Limpieza de Fechas para todas las pestañas
-        # Buscamos las columnas por palabras clave para no fallar
         col_prom = next((c for c in df.columns if 'PROM' in c), None)
         col_taller = next((c for c in df.columns if 'FECHA TALLER' in c), None)
 
@@ -68,7 +78,6 @@ if hoja is not None:
             df['FECHA_TALLER_DT'] = df[col_taller].apply(limpiar_fecha_ar)
 
         # Creamos una FECHA FINAL (usa Taller si existe, sino usa Promesa)
-        # Esta es la que van a usar todas las pestañas para los gráficos
         if 'FECHA_TALLER_DT' in df.columns and 'FECHA_PROM_DT' in df.columns:
             df['FECHA_FINAL'] = df['FECHA_TALLER_DT'].combine_first(df['FECHA_PROM_DT'])
         elif 'FECHA_PROM_DT' in df.columns:
@@ -102,8 +111,11 @@ def cargar_hoja_directa(hoja_gs, nombre_grupo):
 
 if hoja_repuestos:
     df_repuestos = cargar_hoja_directa(hoja_repuestos, "REPUESTOS")
-    if not df_repuestos.empty and 'FECHA TALLER' in df_repuestos.columns:
-        df_repuestos['FECHA_DT'] = df_repuestos['FECHA TALLER'].apply(limpiar_fecha_ar)
+    if not df_repuestos.empty:
+        if 'FECHA TALLER' in df_repuestos.columns:
+            df_repuestos['FECHA_DT'] = df_repuestos['FECHA TALLER'].apply(limpiar_fecha_ar)
+        if 'PRECIO' in df_repuestos.columns:
+            df_repuestos['PRECIO_LIMPIO'] = df_repuestos['PRECIO'].apply(limpiar_plata_general)
 
 if hoja_terceros:
     df_terceros_data = cargar_hoja_directa(hoja_terceros, "TERCEROS")
