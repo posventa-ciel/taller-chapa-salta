@@ -111,7 +111,7 @@ if hoja_terceros:
     if not df_terceros_data.empty:
         for col in ['PRECIO', 'COSTO', 'PAÑOS']:
             if col in df_terceros_data.columns:
-            df_terceros_data[col] = df_terceros_data[col].apply(limpiar_plata_general)
+                df_terceros_data[col] = df_terceros_data[col].apply(limpiar_plata_general)
         if 'FECHA PROM' in df_terceros_data.columns:
             df_terceros_data['FECHA_DT'] = df_terceros_data['FECHA PROM'].apply(limpiar_fecha_ar)
     
