@@ -1349,6 +1349,29 @@ with tab_fac:
             except:
                 st.info("Conectá correctamente la pestaña de REPUESTOS para ver el detalle.")
 
+        # --- GESTIÓN DE TERCEROS ---
+        st.divider()
+        st.markdown("### 🤝 Gestión Financiera de Terceros")
+        df_terceros = df_analisis[(df_analisis['Grupo'] == 'TERCEROS') & (df_analisis['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)']))].copy()
+        
+        if not df_terceros.empty:
+            # Limpiamos los números por las dudas para que no tire error al sumar
+            df_terceros['Precio_Limpio'] = df_terceros[col_precio].apply(limpiar_plata_general)
+            df_terceros['Costo_Limpio'] = df_terceros[col_costo].apply(limpiar_plata_general)
+            
+            tot_ter_fac = df_terceros['Precio_Limpio'].sum()
+            tot_ter_costo = df_terceros['Costo_Limpio'].sum()
+            tot_ter_margen = tot_ter_fac - tot_ter_costo
+            tot_ter_panos = df_terceros[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
+            
+            c_t1, c_t2, c_t3, c_t4 = st.columns(4)
+            c_t1.markdown(f'<div class="metric-card"><div class="metric-title">Total Venta (Terceros)</div><div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div></div>', unsafe_allow_html=True)
+            c_t2.markdown(f'<div class="metric-card"><div class="metric-title">Costo Total</div><div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div></div>', unsafe_allow_html=True)
+            c_t3.markdown(f'<div class="metric-card"><div class="metric-title">Margen de Ganancia</div><div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div></div>', unsafe_allow_html=True)
+            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños Asignados</div><div class="metric-value-number" style="font-size: 1.5rem;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
+        else:
+            st.info("No hay datos de Terceros en estado Facturado o Aprobado para el período seleccionado.")
+            
         # --- AUDITORÍA DE DATOS DETALLADA (Con exclusión de Repuestos) ---
         st.divider()
         st.markdown("### 🚨 Auditoría de Carga (Detectores de Errores)")
