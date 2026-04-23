@@ -743,7 +743,7 @@ with tab_turnos:
         
         edited_sin = st.data_editor(df_sin[columnas_seguras_sin], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_sin")
 
-            if st.button("💾 Guardar Cambios e Ingresos"):
+        if st.button("💾 Guardar Cambios e Ingresos"):
                     with st.spinner("Sincronizando con la base de datos..."):
                         patentes_sheet_raw = hoja.col_values(5) if hoja else []
                         patentes_limpias = ["".join(str(p).split()).upper() for p in patentes_sheet_raw]
