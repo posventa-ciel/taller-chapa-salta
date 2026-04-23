@@ -846,7 +846,9 @@ with tab_turnos:
         st.write("Vehículos listos para entregar al cliente en las fechas seleccionadas.")
         
         if not df.empty:
+            # 🚨 FILTRO APLICADO: Solo agarramos la pestaña GRUPO (y PULIDOS)
             df_no_entregados = df[~df['Estado_Taller'].str.contains("ENTREGADO", na=False)].copy()
+            df_no_entregados = df_no_entregados[df_no_entregados['Grupo'].isin(['GRUPO', 'PULIDOS'])]
             df_no_entregados = df_no_entregados[~df_no_entregados['Patente'].isin(st.session_state.entregas_confirmadas)]
             df_no_entregados['Entregado_OK'] = False
             
@@ -869,7 +871,8 @@ with tab_turnos:
                 entregas_atrasadas['Demora (Días)'] = entregas_atrasadas['Fecha_Promesa_Disp'].apply(lambda x: (hoy.date() - x).days if pd.notna(x) else 0)
                 
                 edit_atra = st.data_editor(
-                    entregas_atrasadas[['Entregado_OK', 'Demora (Días)', 'Fecha Prom.', 'Patente', 'Vehiculo', 'Asesor', 'Estado_Taller', 'Grupo', 'Precio', 'Observaciones']], 
+                    # 🚨 ELIMINAMOS LA COLUMNA 'GRUPO' DE LA LISTA DE ABAJO
+                    entregas_atrasadas[['Entregado_OK', 'Demora (Días)', 'Fecha Prom.', 'Patente', 'Vehiculo', 'Asesor', 'Estado_Taller', 'Precio', 'Observaciones']], 
                     hide_index=True, 
                     use_container_width=True,
                     column_config={
@@ -880,7 +883,6 @@ with tab_turnos:
                         "Vehiculo": st.column_config.TextColumn("Vehículo", disabled=True), 
                         "Asesor": st.column_config.TextColumn("Asesor", disabled=True), 
                         "Estado_Taller": st.column_config.TextColumn("Estado", disabled=True),
-                        "Grupo": st.column_config.TextColumn("Grupo", disabled=True),
                         "Precio": st.column_config.NumberColumn("Monto ($)", format="$ %d", disabled=True),
                         "Observaciones": st.column_config.TextColumn("Observaciones", disabled=True)
                     },
