@@ -440,7 +440,7 @@ def obtener_datos_maestros():
     return pd.DataFrame(filas)
 
 # --- MEMORIA Y CARGA DE DATOS ---
-if 'memoria_turnos_v13' not in st.session_state: 
+if 'memoria_turnos_v12' not in st.session_state: 
     st.session_state.memoria_turnos_v12 = obtener_turnos()
 
 if 'entregas_confirmadas' not in st.session_state:
