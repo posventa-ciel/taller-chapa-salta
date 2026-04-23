@@ -263,7 +263,7 @@ def obtener_turnos():
         if not datos or len(datos) <= 1:
             return pd.DataFrame(columns=columnas_base)
             
-        # 1. Buscamos la fila de títulos inteligentemente
+        # Buscamos la fila de títulos
         idx = 0
         for i, fila in enumerate(datos):
             fila_str = "".join(str(c).upper() for c in fila)
@@ -273,7 +273,7 @@ def obtener_turnos():
                 
         df_t = pd.DataFrame(datos[idx+1:], columns=datos[idx])
         
-        # 2. Blindaje anti-columnas duplicadas
+        # Blindaje anti-columnas duplicadas
         cols_limpias = []
         vistos = {}
         for c in df_t.columns:
@@ -287,11 +287,9 @@ def obtener_turnos():
                 cols_limpias.append(c_upper)
         df_t.columns = cols_limpias
         
-        # 3. Aseguramos que haya al menos 17 columnas
         while len(df_t.columns) < 17:
             df_t[f'FALTANTE_{len(df_t.columns)}'] = ""
             
-        # 4. Extracción
         df_t['Estado_Turno'] = df_t.iloc[:, 0]
         df_t['Fecha_Texto'] = df_t.iloc[:, 1]
         df_t['Hora'] = df_t.iloc[:, 2]
@@ -306,7 +304,7 @@ def obtener_turnos():
         df_t['Referencia'] = df_t.iloc[:, 15]
         df_t['Motivo_Cancelacion'] = df_t.iloc[:, 16]
         
-        # ---> MOTOR DE FECHAS INTELIGENTE (Solución al "17-4") <---
+        # 🚨 CONECTAMOS EL MOTOR DE FECHAS (Para solucionar el "17-4")
         df_t['Fecha_DT'] = df_t['Fecha_Texto'].apply(limpiar_fecha_ar)
         df_t['Fecha'] = df_t['Fecha_DT'].apply(lambda x: x.date() if pd.notna(x) else None)
         
