@@ -1286,13 +1286,11 @@ with tab_fac:
         c_r2.markdown(f'<div class="metric-card" style="border-left: 5px solid #17a2b8;"><div class="metric-title" style="color: #17a2b8;">Aprobado (SI)</div><div class="metric-value-money" style="color:#17a2b8;">{formato_pesos(pesos_si)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(si_mo)} | Rep: {formato_pesos(si_rep)}</div><div class="metric-subtitle-green" style="font-size: 1.1rem; color: #17a2b8; margin-top: 8px;">📦 {panos_si_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
         c_r3.markdown(f'<div class="metric-card" style="border-left: 5px solid #00235d;"><div class="metric-title" style="color:#00235d;">Estimado a Cierre de Mes</div><div class="metric-value-money" style="color:#00235d;">{formato_pesos(pesos_est)}</div><div style="font-size: 0.85em; color: gray;">M.O.: {formato_pesos(fac_mo + si_mo)} | Rep: {formato_pesos(fac_rep + si_rep)}</div><div class="metric-subtitle-gray" style="font-size: 1.1rem; color:#00235d; font-weight: bold; margin-top: 8px;">📦 {panos_est_prop:.1f} paños propios</div></div>', unsafe_allow_html=True)
 
-        st.markdown("<br>", unsafe_allow_html=True)
-        
         # ==========================================
         # --- GESTIÓN DE TERCEROS Y GRAN TOTAL ---
         # ==========================================
-        st.divider()
-        st.markdown("### 🤝 Gestión Financiera de Terceros")
+        st.divider() # Línea divisoria bien pegadita a lo de arriba
+        st.markdown("<h3 style='margin-top: -15px;'>🤝 Gestión Financiera de Terceros</h3>", unsafe_allow_html=True)
         
         # Filtramos por estado para el desglose
         df_ter_fac = df_terceros[df_terceros['Estado_Resumen'] == 'Facturado (FAC)'].copy()
@@ -1319,7 +1317,7 @@ with tab_fac:
         if tot_ter_fac > 0 or tot_ter_panos > 0:
             c_t1, c_t2, c_t3, c_t4 = st.columns(4)
             
-            # Tarjeta Venta: Con desglose de FAC y SI
+            # Tarjeta Venta
             c_t1.markdown(f'''
                 <div class="metric-card">
                     <div class="metric-title">Total Venta (Terceros)</div>
@@ -1328,7 +1326,7 @@ with tab_fac:
                 </div>
             ''', unsafe_allow_html=True)
             
-            # Tarjeta Costo: Con desglose de FAC y SI
+            # Tarjeta Costo
             c_t2.markdown(f'''
                 <div class="metric-card">
                     <div class="metric-title">Costo Total</div>
@@ -1337,7 +1335,7 @@ with tab_fac:
                 </div>
             ''', unsafe_allow_html=True)
             
-            # Tarjeta Margen: Ganancia pura
+            # Tarjeta Margen
             c_t3.markdown(f'''
                 <div class="metric-card">
                     <div class="metric-title">Margen de Ganancia</div>
@@ -1346,7 +1344,7 @@ with tab_fac:
                 </div>
             ''', unsafe_allow_html=True)
             
-            # Tarjeta Paños: Con desglose físico
+            # Tarjeta Paños
             c_t4.markdown(f'''
                 <div class="metric-card">
                     <div class="metric-title">Paños de Terceros</div>
@@ -1356,11 +1354,16 @@ with tab_fac:
             ''', unsafe_allow_html=True)
         else:
             st.info("No hay datos de Terceros para el período seleccionado.")
+            
+        # 📈 EL GRAN TOTAL DE PAÑOS 📈
+        gran_total_panos = panos_est_prop + tot_ter_panos
+        st.markdown(f"<div style='text-align: right; color: #00235d; font-size: 1.1rem; margin-top: 5px; margin-bottom: -10px;'><strong>📈 Gran Total de Producción (Propios + Terceros):</strong> {gran_total_panos:.1f} paños</div>", unsafe_allow_html=True)
         
         # ==========================================
         # 🚨 TARJETAS DE ALERTA: PENDIENTES DE FACTURACIÓN
         # ==========================================
-        st.markdown("### ⚠️ Pendientes de Gestión Administrativa")
+        st.divider() # La línea nueva que pediste para separar la gestión administrativa
+        st.markdown("<h3 style='margin-top: -15px;'>⚠️ Pendientes de Gestión Administrativa</h3>", unsafe_allow_html=True)
         
         # Filtramos estados críticos
         df_pte_entregar = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND ENTREG', na=False)].copy()
