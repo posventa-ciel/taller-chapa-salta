@@ -255,26 +255,63 @@ def obtener_turnos():
             return pd.DataFrame(columns=columnas_base)
         
         datos = hoja.get_all_values()
-        if len(datos) <= 1:
+        if not datos or len(datos) <= 1:
             return pd.DataFrame(columns=columnas_base)
             
-        # La primera fila son los títulos en Sheets
-        df_t = pd.DataFrame(datos[1:], columns=datos[0])
-        
-        # Limpieza y armado de columnas que usa el Kanban y la tabla
-        df_t['Fecha'] = pd.to_datetime(df_t.iloc[:, 1], format='%d/%m/%Y', errors='coerce').dt.date
-        df_t['Cancelado'] = df_t.iloc[:, 0].astype(str).str.upper() == 'C'
-        df_t['Tipo'] = df_t.iloc[:, 0].apply(lambda x: '🚶‍♂️ SIN TURNO' if str(x).upper() == 'N' else '📅 PROGRAMADO')
-        
-        # Casillas de verificación (Checkboxes)
-        df_t['Recibido'] = df_t.get('Recibido', pd.Series(dtype=str)).astype(str).str.upper() == 'SI'
-        df_t['Fotos'] = df_t.get('Fotos', pd.Series(dtype=str)).astype(str).str.upper() == 'SI'
-        
-        # Nos aseguramos de que existan estas columnas para que no rompa la tabla de edición
-        for col in ['Ticket', 'Referencia', 'Observaciones', 'Asesor', 'Cliente', 'Vehiculo', 'Patente', 'Motivo_Cancelacion']:
-            if col not in df_t.columns:
-                df_t[col] = ""
+        # 1. Buscamos la fila de títulos inteligentemente
+        idx = 0
+        for i, fila in enumerate(datos):
+            fila_str = "".join(str(c).upper() for c in fila)
+            if 'FECHA' in fila_str and 'PATENTE' in fila_str:
+                idx = i
+                break
                 
+        df_t = pd.DataFrame(datos[idx+1:], columns=datos[idx])
+        
+        # 2. Blindaje anti-columnas duplicadas
+        cols_limpias = []
+        vistos = {}
+        for c in df_t.columns:
+            c_upper = str(c).upper().strip()
+            if not c_upper: c_upper = "VACIA"
+            if c_upper in vistos:
+                vistos[c_upper] += 1
+                cols_limpias.append(f"{c_upper}_{vistos[c_upper]}")
+            else:
+                vistos[c_upper] = 0
+                cols_limpias.append(c_upper)
+        df_t.columns = cols_limpias
+        
+        # 3. Aseguramos que haya al menos 17 columnas para que no falten datos
+        while len(df_t.columns) < 17:
+            df_t[f'FALTANTE_{len(df_t.columns)}'] = ""
+            
+        # 4. Extracción segura por posición (Inmune a cambios de nombre en Sheets)
+        df_t['Estado_Turno'] = df_t.iloc[:, 0]
+        df_t['Fecha_Texto'] = df_t.iloc[:, 1]
+        df_t['Hora'] = df_t.iloc[:, 2]
+        df_t['Vehiculo'] = df_t.iloc[:, 3]
+        df_t['Patente'] = df_t.iloc[:, 4]
+        df_t['Asesor'] = df_t.iloc[:, 5]
+        df_t['Observaciones'] = df_t.iloc[:, 8]
+        df_t['Cliente'] = df_t.iloc[:, 10]
+        df_t['Ticket'] = df_t.iloc[:, 12]
+        df_t['Recibido_Texto'] = df_t.iloc[:, 13]
+        df_t['Fotos_Texto'] = df_t.iloc[:, 14]
+        df_t['Referencia'] = df_t.iloc[:, 15]
+        df_t['Motivo_Cancelacion'] = df_t.iloc[:, 16]
+        
+        # 5. Transformaciones y normalización
+        df_t['Fecha'] = pd.to_datetime(df_t['Fecha_Texto'], format='%d/%m/%Y', errors='coerce').dt.date
+        df_t['Cancelado'] = df_t['Estado_Turno'].astype(str).str.upper() == 'C'
+        df_t['Tipo'] = df_t['Estado_Turno'].apply(lambda x: '🚶‍♂️ SIN TURNO' if str(x).upper() == 'N' else '📅 PROGRAMADO')
+        df_t['Recibido'] = df_t['Recibido_Texto'].astype(str).str.upper() == 'SI'
+        df_t['Fotos'] = df_t['Fotos_Texto'].astype(str).str.upper() == 'SI'
+        
+        # Limpiamos nulos para que no rompa la tabla de edición
+        for col in ['Ticket', 'Referencia', 'Observaciones', 'Asesor', 'Cliente', 'Vehiculo', 'Patente', 'Motivo_Cancelacion']:
+            df_t[col] = df_t[col].fillna("")
+            
         return df_t
         
     except Exception as e:
