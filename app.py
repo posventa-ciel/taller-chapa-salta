@@ -738,7 +738,10 @@ with tab_turnos:
                     edited_prog = st.data_editor(df_prog[orden_columnas], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_prog")
                 if not df_sin.empty:
                     st.caption("🚶‍♂️ Ingresos Adicionales (Sin Turno)")
-                    edited_sin = st.data_editor(df_sin[orden_columnas_sin], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_sin")
+                    # 🚨 BLINDAJE ANTI-ERRORES: Solo usa las columnas que realmente existen
+        columnas_seguras_sin = [col for col in orden_columnas_sin if col in df_sin.columns]
+        
+        edited_sin = st.data_editor(df_sin[columnas_seguras_sin], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_sin")
 
             if st.button("💾 Guardar Cambios e Ingresos"):
                     with st.spinner("Sincronizando con la base de datos..."):
