@@ -910,29 +910,28 @@ with tab_turnos:
                 otros_grupos = [g for g in entregas_rango['Grupo'].unique() if pd.notna(g) and g not in orden_grupos_maestro]
                 grupos_rango_unicos.extend(otros_grupos)
                 
-                cols_grupos = st.columns(2)
-                for idx, grupo_val in enumerate(grupos_rango_unicos):
-                    with cols_grupos[idx % 2]:
-                        st.caption(f"📍 **{grupo_val}**")
-                        df_g_rango = entregas_rango[entregas_rango['Grupo'] == grupo_val].sort_values(by=['Fecha_Promesa_Disp', 'Hora_Entrega'])
-                        
-                        edit_g = st.data_editor(
-                            df_g_rango[['Entregado_OK', 'Fecha Prom.', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Precio', 'Observaciones']], 
-                            hide_index=True, 
-                            use_container_width=True,
-                            column_config={
-                                "Entregado_OK": st.column_config.CheckboxColumn("✅ Listo", default=False),
-                                "Fecha Prom.": st.column_config.TextColumn("📅 Día", disabled=True),
-                                "Hora_Entrega": st.column_config.TextColumn("⌚ Hora", disabled=True),
-                                "Patente": st.column_config.TextColumn("Patente", disabled=True), 
-                                "Vehiculo": st.column_config.TextColumn("Vehículo", disabled=True), 
-                                "Asesor": st.column_config.TextColumn("Asesor", disabled=True),
-                                "Precio": st.column_config.NumberColumn("Monto ($)", format="$ %d", disabled=True),
-                                "Observaciones": st.column_config.TextColumn("Observaciones", disabled=True)
-                            },
-                            key=f"editor_entregas_rango_{grupo_val.replace(' ', '_')}"
-                        )
-                        edit_rango_df = pd.concat([edit_rango_df, edit_g])
+                # Eliminamos las columnas divididas y lo mostramos a lo ancho
+                for grupo_val in grupos_rango_unicos:
+                    st.caption(f"📍 **Sector: {grupo_val}**")
+                    df_g_rango = entregas_rango[entregas_rango['Grupo'] == grupo_val].sort_values(by=['Fecha_Promesa_Disp', 'Hora_Entrega'])
+                    
+                    edit_g = st.data_editor(
+                        df_g_rango[['Entregado_OK', 'Fecha Prom.', 'Hora_Entrega', 'Patente', 'Vehiculo', 'Asesor', 'Precio', 'Observaciones']], 
+                        hide_index=True, 
+                        use_container_width=True,
+                        column_config={
+                            "Entregado_OK": st.column_config.CheckboxColumn("✅ Listo", default=False),
+                            "Fecha Prom.": st.column_config.TextColumn("📅 Día", disabled=True),
+                            "Hora_Entrega": st.column_config.TextColumn("⌚ Hora", disabled=True),
+                            "Patente": st.column_config.TextColumn("Patente", disabled=True), 
+                            "Vehiculo": st.column_config.TextColumn("Vehículo", disabled=True), 
+                            "Asesor": st.column_config.TextColumn("Asesor", disabled=True),
+                            "Precio": st.column_config.NumberColumn("Monto ($)", format="$ %d", disabled=True),
+                            "Observaciones": st.column_config.TextColumn("Observaciones", disabled=True)
+                        },
+                        key=f"editor_entregas_rango_{grupo_val.replace(' ', '_')}"
+                    )
+                    edit_rango_df = pd.concat([edit_rango_df, edit_g])
             else:
                 st.info("No hay entregas pendientes para el rango y/o asesor seleccionado.")
                     
