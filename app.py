@@ -1465,6 +1465,61 @@ with tab_fac:
             st.dataframe(resumen_si_cat[['Categoría_Real', 'Vehículos', 'Paños', 'M.O. ($)']], hide_index=True, use_container_width=True)
 
         st.divider()
+        
+        # ==========================================
+        # 📡 RADAR DE TURNOS PARA PRÓXIMOS MESES
+        # ==========================================
+        st.divider()
+        st.markdown("### 📡 Radar de Turnos Programados para Próximos Meses")
+        
+        try:
+            # Función rápida para limpiar plata localmente
+            def plata_radar(x):
+                try: return float(str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.'))
+                except: return 0.0
+            
+            # Calculamos inteligente los próximos dos meses
+            h_radar = hoy.date()
+            m1_m = h_radar.month % 12 + 1
+            m1_y = h_radar.year + (h_radar.month // 12)
+            m2_m = m1_m % 12 + 1
+            m2_y = m1_y + (m1_m // 12)
+            
+            nombres_m = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
+            
+            if 'df_t' in globals() and not df_t.empty:
+                df_rad = df_t[df_t['Cancelado'] == False].copy()
+                df_rad['Fecha_DT'] = pd.to_datetime(df_rad['Fecha_DT'], errors='coerce')
+                
+                # Cálculos Mes 1
+                df_m1 = df_rad[(df_rad['Fecha_DT'].dt.month == m1_m) & (df_rad['Fecha_DT'].dt.year == m1_y)]
+                panos_m1 = df_m1['Paños'].apply(lambda x: pd.to_numeric(str(x).replace(',', '.'), errors='coerce')).fillna(0).sum()
+                plata_m1 = df_m1['Precio'].apply(plata_radar).sum()
+                
+                # Cálculos Mes 2
+                df_m2 = df_rad[(df_rad['Fecha_DT'].dt.month == m2_m) & (df_rad['Fecha_DT'].dt.year == m2_y)]
+                panos_m2 = df_m2['Paños'].apply(lambda x: pd.to_numeric(str(x).replace(',', '.'), errors='coerce')).fillna(0).sum()
+                plata_m2 = df_m2['Precio'].apply(plata_radar).sum()
+                
+                obj_panos_radar = globals().get('OBJETIVO_MENSUAL_PANOS', 150)
+                
+                c_rad1, c_rad2 = st.columns(2)
+                
+                with c_rad1:
+                    st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00A8E8;"><div class="metric-title">Proyección {nombres_m[m1_m]}</div><div class="metric-value-number" style="color:#00509E;">{panos_m1:.1f} paños</div><div style="font-size: 0.9em; color: gray;">Estimación: {formato_pesos(plata_m1)}</div></div>', unsafe_allow_html=True)
+                    prog_m1 = min(int((panos_m1 / obj_panos_radar) * 100) if obj_panos_radar > 0 else 0, 100)
+                    st.progress(prog_m1)
+                    st.caption(f"Reservado el **{prog_m1}%** del objetivo de {obj_panos_radar} paños.")
+                    
+                with c_rad2:
+                    st.markdown(f'<div class="metric-card" style="border-left: 5px solid #6c757d;"><div class="metric-title">Proyección {nombres_m[m2_m]}</div><div class="metric-value-number" style="color:#495057;">{panos_m2:.1f} paños</div><div style="font-size: 0.9em; color: gray;">Estimación: {formato_pesos(plata_m2)}</div></div>', unsafe_allow_html=True)
+                    prog_m2 = min(int((panos_m2 / obj_panos_radar) * 100) if obj_panos_radar > 0 else 0, 100)
+                    st.progress(prog_m2)
+                    st.caption(f"Reservado el **{prog_m2}%** del objetivo de {obj_panos_radar} paños.")
+        except Exception as e:
+            pass
+
+        st.divider()
 
         # --- CURVAS (Construidas SOLO con producción propia) ---
         if mes_filtro != "TODOS":
