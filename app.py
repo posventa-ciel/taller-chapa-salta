@@ -1293,31 +1293,69 @@ with tab_fac:
         # ==========================================
         st.divider()
         st.markdown("### 🤝 Gestión Financiera de Terceros")
-        df_terceros_cerrados = df_terceros[df_terceros['Estado_Resumen'].isin(['Facturado (FAC)', 'Aprobado (SI)'])].copy()
         
-        tot_ter_panos = 0
-        if not df_terceros_cerrados.empty:
-            df_terceros_cerrados['Precio_Limpio'] = df_terceros_cerrados[col_precio].apply(limpiar_plata_general)
-            df_terceros_cerrados['Costo_Limpio'] = df_terceros_cerrados[col_costo].apply(limpiar_plata_general)
-            
-            tot_ter_fac = df_terceros_cerrados['Precio_Limpio'].sum()
-            tot_ter_costo = df_terceros_cerrados['Costo_Limpio'].sum()
-            tot_ter_margen = tot_ter_fac - tot_ter_costo
-            tot_ter_panos = df_terceros_cerrados[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum()
-            
-            c_t1, c_t2, c_t3, c_t4 = st.columns(4)
-            c_t1.markdown(f'<div class="metric-card"><div class="metric-title">Total Venta (Terceros)</div><div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div></div>', unsafe_allow_html=True)
-            c_t2.markdown(f'<div class="metric-card"><div class="metric-title">Costo Total</div><div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div></div>', unsafe_allow_html=True)
-            c_t3.markdown(f'<div class="metric-card"><div class="metric-title">Margen de Ganancia</div><div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div></div>', unsafe_allow_html=True)
-            c_t4.markdown(f'<div class="metric-card"><div class="metric-title">Paños de Terceros</div><div class="metric-value-number" style="font-size: 1.5rem; color:#6f42c1;">{tot_ter_panos:.1f}</div></div>', unsafe_allow_html=True)
-        else:
-            st.info("No hay datos de Terceros en estado Facturado o Aprobado para el período seleccionado.")
+        # Filtramos por estado para el desglose
+        df_ter_fac = df_terceros[df_terceros['Estado_Resumen'] == 'Facturado (FAC)'].copy()
+        df_ter_si = df_terceros[df_terceros['Estado_Resumen'] == 'Aprobado (SI)'].copy()
+        
+        # Cálculos de Ventas (Precios)
+        v_fac_ter = df_ter_fac[col_precio].apply(limpiar_plata_general).sum() if not df_ter_fac.empty else 0
+        v_si_ter = df_ter_si[col_precio].apply(limpiar_plata_general).sum() if not df_ter_si.empty else 0
+        
+        # Cálculos de Costos
+        c_fac_ter = df_ter_fac[col_costo].apply(limpiar_plata_general).sum() if not df_ter_fac.empty else 0
+        c_si_ter = df_ter_si[col_costo].apply(limpiar_plata_general).sum() if not df_ter_si.empty else 0
+        
+        # Cálculos de Paños
+        p_fac_ter = df_ter_fac[col_panos].apply(pd.to_numeric, errors='coerce').sum() if not df_ter_fac.empty else 0
+        p_si_ter = df_ter_si[col_panos].apply(pd.to_numeric, errors='coerce').sum() if not df_ter_si.empty else 0
 
-        st.markdown("<br>", unsafe_allow_html=True)
+        # Totales Generales (La suma de ambos)
+        tot_ter_fac = v_fac_ter + v_si_ter
+        tot_ter_costo = c_fac_ter + c_si_ter
+        tot_ter_margen = tot_ter_fac - tot_ter_costo
+        tot_ter_panos = p_fac_ter + p_si_ter
         
-        # --- EL TOTAL SUTIL ---
-        gran_total_general = panos_est_prop + tot_ter_panos
-        st.write(f"📈 **Gran Total de Producción Física (Propios + Terceros):** {gran_total_general:.1f} Paños")
+        if tot_ter_fac > 0 or tot_ter_panos > 0:
+            c_t1, c_t2, c_t3, c_t4 = st.columns(4)
+            
+            # Tarjeta Venta: Con desglose de FAC y SI
+            c_t1.markdown(f'''
+                <div class="metric-card">
+                    <div class="metric-title">Total Venta (Terceros)</div>
+                    <div class="metric-value-money" style="font-size: 1.5rem;">{formato_pesos(tot_ter_fac)}</div>
+                    <div style="font-size: 0.8em; color: gray;">FAC: {formato_pesos(v_fac_ter)} | SI: {formato_pesos(v_si_ter)}</div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            # Tarjeta Costo: Con desglose de FAC y SI
+            c_t2.markdown(f'''
+                <div class="metric-card">
+                    <div class="metric-title">Costo Total</div>
+                    <div class="metric-value-money" style="color:#dc3545; font-size: 1.5rem;">{formato_pesos(tot_ter_costo)}</div>
+                    <div style="font-size: 0.8em; color: gray;">FAC: {formato_pesos(c_fac_ter)} | SI: {formato_pesos(c_si_ter)}</div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            # Tarjeta Margen: Ganancia pura
+            c_t3.markdown(f'''
+                <div class="metric-card">
+                    <div class="metric-title">Margen de Ganancia</div>
+                    <div class="metric-value-money" style="color:#28a745; font-size: 1.5rem;">{formato_pesos(tot_ter_margen)}</div>
+                    <div style="font-size: 0.8em; color: gray;">Rentabilidad de Terceros</div>
+                </div>
+            ''', unsafe_allow_html=True)
+            
+            # Tarjeta Paños: Con desglose físico
+            c_t4.markdown(f'''
+                <div class="metric-card">
+                    <div class="metric-title">Paños de Terceros</div>
+                    <div class="metric-value-number" style="font-size: 1.5rem; color:#6f42c1;">{tot_ter_panos:.1f}</div>
+                    <div style="font-size: 0.8em; color: gray;">FAC: {p_fac_ter:.1f} | SI: {p_si_ter:.1f}</div>
+                </div>
+            ''', unsafe_allow_html=True)
+        else:
+            st.info("No hay datos de Terceros para el período seleccionado.")
         
         # ==========================================
         # 🚨 TARJETAS DE ALERTA: PENDIENTES DE FACTURACIÓN
