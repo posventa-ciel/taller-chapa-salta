@@ -1328,12 +1328,25 @@ with tab_fac:
         df_pte_entregar = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND ENTREG', na=False)].copy()
         df_pte_factura = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND FACT|ENTREGADO PEND FACT', na=False)].copy()
         
+        # Calculamos montos y paños para Tarjeta 1
+        monto_pte_entregar = df_pte_entregar[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_pte_entregar.columns else 0
+        panos_pte_entregar = df_pte_entregar[col_panos].apply(pd.to_numeric, errors='coerce').sum() if col_panos in df_pte_entregar.columns else 0
+
+        # Calculamos montos y paños para Tarjeta 2
+        df_t_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('TERM', na=False)]
+        monto_t_f = df_t_f[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_t_f.columns else 0
+        panos_t_f = df_t_f[col_panos].apply(pd.to_numeric, errors='coerce').sum() if col_panos in df_t_f.columns else 0
+
+        # Calculamos montos y paños para Tarjeta 3
+        df_e_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('ENTREGADO', na=False)]
+        monto_e_f = df_e_f[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_e_f.columns else 0
+        panos_e_f = df_e_f[col_panos].apply(pd.to_numeric, errors='coerce').sum() if col_panos in df_e_f.columns else 0
+
         # Calculamos Repuestos Pendientes (Solo Salta) - BLINDADO
         cant_rep_pte = 0
         monto_rep_pte = 0.0
         try:
             if 'df_repuestos' in globals() and not df_repuestos.empty:
-                # Usamos el buscador inteligente para evitar errores de columnas
                 col_fac_r = encontrar_columna(df_repuestos, ['FAC', 'ESTADO'], 'FAC')
                 col_pre_r = encontrar_columna(df_repuestos, ['PRECIO', 'MONTO'], 'PRECIO')
                 
@@ -1342,11 +1355,8 @@ with tab_fac:
                 
                 if col_pre_r in df_rep_pte.columns:
                     precios = df_rep_pte[col_pre_r]
-                    # Si la columna PRECIO está duplicada en Excel, agarramos solo la primera
                     if isinstance(precios, pd.DataFrame): 
                         precios = precios.iloc[:, 0]
-                        
-                    # Forzamos a que el resultado sea un float (número puro) para que formato_pesos no falle
                     monto_rep_pte = float(precios.apply(limpiar_plata_general).sum())
         except Exception as e:
             pass
@@ -1358,27 +1368,28 @@ with tab_fac:
             <div class="metric-card" style="border-left: 5px solid #ffc107;">
                 <div class="metric-title">Terminados Pte. Entrega</div>
                 <div class="metric-value-number" style="color:#856404;">{len(df_pte_entregar)} autos</div>
-                <div class="metric-subtitle-purple">{df_pte_entregar[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+                <div style="font-weight: bold; color: #6c757d; font-size: 1.1rem; margin-top: 5px;">{formato_pesos(monto_pte_entregar)}</div>
+                <div class="metric-subtitle-purple" style="margin-top: 2px;">{panos_pte_entregar:.1f} paños</div>
             </div>
         ''', unsafe_allow_html=True)
 
         # Tarjeta 2: Terminados sin facturar
-        df_t_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('TERM', na=False)]
         c_alt2.markdown(f'''
             <div class="metric-card" style="border-left: 5px solid #dc3545;">
                 <div class="metric-title">Terminados Pte. Factura</div>
                 <div class="metric-value-number" style="color:#721c24;">{len(df_t_f)} autos</div>
-                <div class="metric-subtitle-red">{df_t_f[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+                <div style="font-weight: bold; color: #6c757d; font-size: 1.1rem; margin-top: 5px;">{formato_pesos(monto_t_f)}</div>
+                <div class="metric-subtitle-red" style="margin-top: 2px;">{panos_t_f:.1f} paños</div>
             </div>
         ''', unsafe_allow_html=True)
 
         # Tarjeta 3: Entregados sin facturar
-        df_e_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('ENTREGADO', na=False)]
         c_alt3.markdown(f'''
             <div class="metric-card" style="border-left: 5px solid #6f42c1;">
                 <div class="metric-title">Entregados Pte. Factura</div>
                 <div class="metric-value-number" style="color:#4b2354;">{len(df_e_f)} autos</div>
-                <div class="metric-subtitle-purple">{df_e_f[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+                <div style="font-weight: bold; color: #6c757d; font-size: 1.1rem; margin-top: 5px;">{formato_pesos(monto_e_f)}</div>
+                <div class="metric-subtitle-purple" style="margin-top: 2px;">{panos_e_f:.1f} paños</div>
             </div>
         ''', unsafe_allow_html=True)
 
@@ -1387,7 +1398,7 @@ with tab_fac:
             <div class="metric-card" style="border-left: 5px solid #17a2b8;">
                 <div class="metric-title">Repuestos Pte. Factura</div>
                 <div class="metric-value-number" style="color:#0c5460;">{cant_rep_pte} pedidos</div>
-                <div class="metric-subtitle-blue">{formato_pesos(monto_rep_pte)}</div>
+                <div style="font-weight: bold; color: #17a2b8; font-size: 1.1rem; margin-top: 5px;">{formato_pesos(monto_rep_pte)}</div>
             </div>
         ''', unsafe_allow_html=True)
 
