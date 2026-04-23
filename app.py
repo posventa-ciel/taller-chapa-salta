@@ -1467,57 +1467,56 @@ with tab_fac:
         st.divider()
         
         # ==========================================
-        # 📡 RADAR DE TURNOS PARA PRÓXIMOS MESES
+        # 🔭 RADAR DEL MES SIGUIENTE (ESTADO 'NO')
         # ==========================================
-        st.divider()
-        st.markdown("### 📡 Radar de Turnos Programados para Próximos Meses")
+        st.markdown("<br>", unsafe_allow_html=True) # Espacio limpio sin líneas feas
+        st.markdown("### 🔭 Radar del Mes Siguiente (Estado 'NO')")
+        st.write("Vehículos marcados con estado **'NO'** en la facturación. Esto representa el colchón de trabajo/plata que se patea y asegura para arrancar el próximo mes.")
         
-        try:
-            # Función rápida para limpiar plata localmente
-            def plata_radar(x):
-                try: return float(str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.'))
-                except: return 0.0
-            
-            # Calculamos inteligente los próximos dos meses
-            h_radar = hoy.date()
-            m1_m = h_radar.month % 12 + 1
-            m1_y = h_radar.year + (h_radar.month // 12)
-            m2_m = m1_m % 12 + 1
-            m2_y = m1_y + (m1_m // 12)
-            
-            nombres_m = {1: 'Enero', 2: 'Febrero', 3: 'Marzo', 4: 'Abril', 5: 'Mayo', 6: 'Junio', 7: 'Julio', 8: 'Agosto', 9: 'Septiembre', 10: 'Octubre', 11: 'Noviembre', 12: 'Diciembre'}
-            
-            if 'df_t' in globals() and not df_t.empty:
-                df_rad = df_t[df_t['Cancelado'] == False].copy()
-                df_rad['Fecha_DT'] = pd.to_datetime(df_rad['Fecha_DT'], errors='coerce')
+        # Filtramos los que dicen "NO" en la columna de Facturación de tu hoja principal
+        df_radar_no = df_analisis[df_analisis[col_est_fac].astype(str).str.strip().str.upper() == 'NO'].copy()
+        
+        cant_autos_no = len(df_radar_no)
+        panos_no = df_radar_no[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).fillna(0).sum() if col_panos in df_radar_no else 0
+        plata_no = df_radar_no[col_precio].apply(limpiar_plata_general).sum() if col_precio in df_radar_no else 0
+        
+        c_rn1, c_rn2, c_rn3 = st.columns(3)
+        
+        c_rn1.markdown(f'''
+            <div class="metric-card" style="border: 1px solid #e0e0e0; box-shadow: none;">
+                <div class="metric-title" style="text-align: center; color: gray; font-size: 0.85rem;">AUTOS PARA PRÓX. MES</div>
+                <div class="metric-value-number" style="color:#6f42c1; text-align: center;">{cant_autos_no}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        c_rn2.markdown(f'''
+            <div class="metric-card" style="border: 1px solid #e0e0e0; box-shadow: none;">
+                <div class="metric-title" style="text-align: center; color: gray; font-size: 0.85rem;">PAÑOS ASEGURADOS</div>
+                <div class="metric-value-number" style="color:#6f42c1; text-align: center;">{panos_no:.1f}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        c_rn3.markdown(f'''
+            <div class="metric-card" style="border: 1px solid #e0e0e0; box-shadow: none;">
+                <div class="metric-title" style="text-align: center; color: gray; font-size: 0.85rem;">PLATA PROYECTADA</div>
+                <div class="metric-value-money" style="color:#6f42c1; text-align: center;">{formato_pesos(plata_no)}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+        
+        if cant_autos_no > 0:
+            with st.expander(" > Ver detalle de los autos marcados con 'NO'"):
+                # Buscamos columnas seguras para mostrar en la tablita desplegable
+                cols_mostrar = [c for c in [col_patente, 'Vehiculo', col_asesor, col_est_taller, col_panos, col_precio] if c in df_radar_no.columns]
                 
-                # Cálculos Mes 1
-                df_m1 = df_rad[(df_rad['Fecha_DT'].dt.month == m1_m) & (df_rad['Fecha_DT'].dt.year == m1_y)]
-                panos_m1 = df_m1['Paños'].apply(lambda x: pd.to_numeric(str(x).replace(',', '.'), errors='coerce')).fillna(0).sum()
-                plata_m1 = df_m1['Precio'].apply(plata_radar).sum()
-                
-                # Cálculos Mes 2
-                df_m2 = df_rad[(df_rad['Fecha_DT'].dt.month == m2_m) & (df_rad['Fecha_DT'].dt.year == m2_y)]
-                panos_m2 = df_m2['Paños'].apply(lambda x: pd.to_numeric(str(x).replace(',', '.'), errors='coerce')).fillna(0).sum()
-                plata_m2 = df_m2['Precio'].apply(plata_radar).sum()
-                
-                obj_panos_radar = globals().get('OBJETIVO_MENSUAL_PANOS', 150)
-                
-                c_rad1, c_rad2 = st.columns(2)
-                
-                with c_rad1:
-                    st.markdown(f'<div class="metric-card" style="border-left: 5px solid #00A8E8;"><div class="metric-title">Proyección {nombres_m[m1_m]}</div><div class="metric-value-number" style="color:#00509E;">{panos_m1:.1f} paños</div><div style="font-size: 0.9em; color: gray;">Estimación: {formato_pesos(plata_m1)}</div></div>', unsafe_allow_html=True)
-                    prog_m1 = min(int((panos_m1 / obj_panos_radar) * 100) if obj_panos_radar > 0 else 0, 100)
-                    st.progress(prog_m1)
-                    st.caption(f"Reservado el **{prog_m1}%** del objetivo de {obj_panos_radar} paños.")
-                    
-                with c_rad2:
-                    st.markdown(f'<div class="metric-card" style="border-left: 5px solid #6c757d;"><div class="metric-title">Proyección {nombres_m[m2_m]}</div><div class="metric-value-number" style="color:#495057;">{panos_m2:.1f} paños</div><div style="font-size: 0.9em; color: gray;">Estimación: {formato_pesos(plata_m2)}</div></div>', unsafe_allow_html=True)
-                    prog_m2 = min(int((panos_m2 / obj_panos_radar) * 100) if obj_panos_radar > 0 else 0, 100)
-                    st.progress(prog_m2)
-                    st.caption(f"Reservado el **{prog_m2}%** del objetivo de {obj_panos_radar} paños.")
-        except Exception as e:
-            pass
+                # Le damos formato a la tabla para que el precio se vea lindo
+                st.dataframe(
+                    df_radar_no[cols_mostrar], 
+                    hide_index=True, 
+                    use_container_width=True,
+                    column_config={
+                        col_precio: st.column_config.NumberColumn("Precio ($)", format="$ %d")
+                    }
+                )
 
         st.divider()
 
