@@ -34,7 +34,7 @@ except Exception as e:
 
 # --- FUNCIONES DE LIMPIEZA GLOBAL (PARA TODA LA APP) ---
 
-# Función para traducir fechas tipo "11-Mar" o "abr" al formato de Python
+# Función para traducir fechas y blindar el año 2026
 def limpiar_fecha_ar(fecha_str):
     if pd.isna(fecha_str) or str(fecha_str).strip() == '': return pd.NaT
     f = str(fecha_str).strip().lower()
@@ -43,8 +43,13 @@ def limpiar_fecha_ar(fecha_str):
         f = f.replace(es, en)
     try:
         dt = pd.to_datetime(f, dayfirst=True, errors='coerce')
-        if pd.notna(dt) and dt.year < 2000:
-            dt = dt.replace(year=pd.Timestamp.now().year)
+        if pd.notna(dt):
+            # 🚨 SOLUCIÓN AÑO 2026: Si ponés "17-4", lo forzamos al año 2026.
+            tiene_anio = re.search(r'\d{4}', f) or re.search(r'/\d{2}$', f) or re.search(r'-\d{2}$', f)
+            if not tiene_anio:
+                dt = dt.replace(year=2026) 
+            elif dt.year < 2000:
+                dt = dt.replace(year=2026)
         return dt
     except:
         return pd.NaT
