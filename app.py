@@ -1329,13 +1329,28 @@ with tab_fac:
         df_pte_entregar = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND ENTREG', na=False)].copy()
         df_pte_factura = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND FACT|ENTREGADO PEND FACT', na=False)].copy()
         
-        # Calculamos Repuestos Pendientes (Solo Salta)
+        # Calculamos Repuestos Pendientes (Solo Salta) - BLINDADO
+        cant_rep_pte = 0
+        monto_rep_pte = 0.0
         try:
-            df_rep_pte = df_repuestos[df_repuestos['FAC'].astype(str).str.strip().str.upper() == 'SI'].copy()
-            cant_rep_pte = len(df_rep_pte)
-            monto_rep_pte = df_rep_pte['PRECIO'].apply(limpiar_plata_general).sum()
-        except:
-            cant_rep_pte, monto_rep_pte = 0, 0
+            if 'df_repuestos' in globals() and not df_repuestos.empty:
+                # Usamos el buscador inteligente para evitar errores de columnas
+                col_fac_r = encontrar_columna(df_repuestos, ['FAC', 'ESTADO'], 'FAC')
+                col_pre_r = encontrar_columna(df_repuestos, ['PRECIO', 'MONTO'], 'PRECIO')
+                
+                df_rep_pte = df_repuestos[df_repuestos[col_fac_r].astype(str).str.strip().str.upper() == 'SI'].copy()
+                cant_rep_pte = len(df_rep_pte)
+                
+                if col_pre_r in df_rep_pte.columns:
+                    precios = df_rep_pte[col_pre_r]
+                    # Si la columna PRECIO está duplicada en Excel, agarramos solo la primera
+                    if isinstance(precios, pd.DataFrame): 
+                        precios = precios.iloc[:, 0]
+                        
+                    # Forzamos a que el resultado sea un float (número puro) para que formato_pesos no falle
+                    monto_rep_pte = float(precios.apply(limpiar_plata_general).sum())
+        except Exception as e:
+            pass
 
         c_alt1, c_alt2, c_alt3, c_alt4 = st.columns(4)
         
