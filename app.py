@@ -739,11 +739,11 @@ with tab_turnos:
                 if not df_sin.empty:
                     st.caption("🚶‍♂️ Ingresos Adicionales (Sin Turno)")
                     # 🚨 BLINDAJE ANTI-ERRORES: Solo usa las columnas que realmente existen
-        columnas_seguras_sin = [col for col in orden_columnas_sin if col in df_sin.columns]
+                    columnas_seguras_sin = [col for col in orden_columnas_sin if col in df_sin.columns]
         
-        edited_sin = st.data_editor(df_sin[columnas_seguras_sin], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_sin")
+                    edited_sin = st.data_editor(df_sin[columnas_seguras_sin], column_config=conf_columnas, hide_index=True, use_container_width=True, key="editor_sin")
 
-        if st.button("💾 Guardar Cambios e Ingresos"):
+            if st.button("💾 Guardar Cambios e Ingresos"):
                     with st.spinner("Sincronizando con la base de datos..."):
                         patentes_sheet_raw = hoja.col_values(5) if hoja else []
                         patentes_limpias = ["".join(str(p).split()).upper() for p in patentes_sheet_raw]
