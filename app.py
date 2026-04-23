@@ -1319,6 +1319,65 @@ with tab_fac:
         # --- EL TOTAL SUTIL ---
         gran_total_general = panos_est_prop + tot_ter_panos
         st.write(f"📈 **Gran Total de Producción Física (Propios + Terceros):** {gran_total_general:.1f} Paños")
+        
+        # ==========================================
+        # 🚨 TARJETAS DE ALERTA: PENDIENTES DE FACTURACIÓN
+        # ==========================================
+        st.markdown("### ⚠️ Pendientes de Gestión Administrativa")
+        
+        # Filtramos estados críticos
+        df_pte_entregar = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND ENTREG', na=False)].copy()
+        df_pte_factura = df_analisis[df_analisis[col_est_taller].str.contains('TERM PEND FACT|ENTREGADO PEND FACT', na=False)].copy()
+        
+        # Calculamos Repuestos Pendientes (Solo Salta)
+        try:
+            df_rep_pte = df_repuestos[df_repuestos['FAC'].astype(str).str.strip().str.upper() == 'SI'].copy()
+            cant_rep_pte = len(df_rep_pte)
+            monto_rep_pte = df_rep_pte['PRECIO'].apply(limpiar_plata_general).sum()
+        except:
+            cant_rep_pte, monto_rep_pte = 0, 0
+
+        c_alt1, c_alt2, c_alt3, c_alt4 = st.columns(4)
+        
+        # Tarjeta 1: Terminados sin entregar
+        c_alt1.markdown(f'''
+            <div class="metric-card" style="border-left: 5px solid #ffc107;">
+                <div class="metric-title">Terminados Pte. Entrega</div>
+                <div class="metric-value-number" style="color:#856404;">{len(df_pte_entregar)} autos</div>
+                <div class="metric-subtitle-purple">{df_pte_entregar[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+        # Tarjeta 2: Terminados sin facturar
+        df_t_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('TERM', na=False)]
+        c_alt2.markdown(f'''
+            <div class="metric-card" style="border-left: 5px solid #dc3545;">
+                <div class="metric-title">Terminados Pte. Factura</div>
+                <div class="metric-value-number" style="color:#721c24;">{len(df_t_f)} autos</div>
+                <div class="metric-subtitle-red">{df_t_f[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+        # Tarjeta 3: Entregados sin facturar
+        df_e_f = df_pte_factura[df_pte_factura[col_est_taller].str.contains('ENTREGADO', na=False)]
+        c_alt3.markdown(f'''
+            <div class="metric-card" style="border-left: 5px solid #6f42c1;">
+                <div class="metric-title">Entregados Pte. Factura</div>
+                <div class="metric-value-number" style="color:#4b2354;">{len(df_e_f)} autos</div>
+                <div class="metric-subtitle-purple">{df_e_f[col_panos].apply(pd.to_numeric, errors='coerce').sum():.1f} paños</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+        # Tarjeta 4: Repuestos Pendientes (Salta Especial)
+        c_alt4.markdown(f'''
+            <div class="metric-card" style="border-left: 5px solid #17a2b8;">
+                <div class="metric-title">Repuestos Pte. Factura</div>
+                <div class="metric-value-number" style="color:#0c5460;">{cant_rep_pte} pedidos</div>
+                <div class="metric-subtitle-blue">{formato_pesos(monto_rep_pte)}</div>
+            </div>
+        ''', unsafe_allow_html=True)
+
+        st.markdown("<br>", unsafe_allow_html=True)
 
         with st.expander("🔍 Radiografía del Aprobado Propios (¿Dónde está la plata del 'SI'?)", expanded=True):
             df_si_detail = df_si_prop.copy()
