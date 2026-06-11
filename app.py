@@ -224,7 +224,11 @@ def parsear_fecha_español(texto):
         if mes_num := meses_abrev.get(mes_str): return datetime(datetime.now().year, mes_num, dia)
 
     match_dm = re.match(r'^(\d{1,2})[-/](\d{1,2})$', texto)
-    if match_dm: return datetime(datetime.now().year, int(match_dm.groups()[1]), int(match_dm.groups()[0]))
+    if match_dm: 
+        try:
+            return datetime(datetime.now().year, int(match_dm.groups()[1]), int(match_dm.groups()[0]))
+        except ValueError:
+            return None  # Si escriben una fecha que no existe (ej: 31/04), la ignora y no rompe la app
     
     try:
         res = pd.to_datetime(texto, dayfirst=True)
