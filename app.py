@@ -1223,10 +1223,28 @@ with tab_fac:
 
         def limpiar_plata_general(x):
             if pd.isna(x): return 0.0
+            
+            # Si ya viene como número puro desde Excel, lo respetamos tal cual
             if isinstance(x, (int, float)): return float(x)
-            x = str(x).replace('$', '').replace(' ', '').replace('.', '').replace(',', '.') 
-            try: return float(x)
-            except: return 0.0
+            
+            x_str = str(x).strip()
+            if not x_str: return 0.0
+            
+            # 1. Detectamos si es negativo ANTES de limpiar (busca el signo menos o paréntesis contables)
+            es_negativo = '-' in x_str or (x_str.startswith('(') and x_str.endswith(')'))
+            
+            # 2. Limpiamos toda la "basura" visual (pesos, espacios, guiones y paréntesis)
+            x_str = x_str.replace('$', '').replace(' ', '').replace('-', '').replace('(', '').replace(')', '')
+            
+            # 3. Acomodamos los miles y decimales al formato de Python
+            x_str = x_str.replace('.', '').replace(',', '.')
+            
+            try: 
+                valor = float(x_str)
+                # 4. Si habíamos detectado que era negativo, le devolvemos su signo
+                return -valor if es_negativo else valor
+            except: 
+                return 0.0
 
         def clasificar_estado(row):
             est_taller = str(row.get(col_est_taller, '')).upper()
