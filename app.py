@@ -412,9 +412,26 @@ def obtener_datos_maestros():
         f_ingreso = parsear_fecha_español(row.get('FECHA_INGRESO_TALLER', ''))
         
         def limpiar_num(val):
-            v = str(val).replace('$', '').replace('.', '').replace(',', '.').strip()
-            try: return float(re.findall(r"[-+]?\d*\.\d+|\d+", v)[0]) if re.findall(r"[-+]?\d*\.\d+|\d+", v) else 0.0
-            except: return 0.0
+            if pd.isna(val): return 0.0
+            if isinstance(val, (int, float)): return float(val)
+            v = str(val).strip()
+            if not v: return 0.0
+            
+            # 1. RADAR: Detectamos si es negativo antes de que se pierda el signo
+            es_neg = any(s in v for s in ['-', '−', '–', '—']) or (v.startswith('(') and v.endswith(')'))
+            
+            # 2. LIMPIEZA: Borramos letras, signos $ y espacios
+            v_limpio = re.sub(r'[^\d.,]', '', v)
+            if not v_limpio: return 0.0
+            
+            # 3. FORMATO: Pasamos formato argentino a código
+            v_limpio = v_limpio.replace('.', '').replace(',', '.')
+            
+            try: 
+                num = float(v_limpio)
+                return -num if es_neg else num
+            except: 
+                return 0.0
 
         panos = limpiar_num(row.get('PAÑOS', 0))
         dias_rep = limpiar_num(row.get('DIAS_TRABAJO', 0))
