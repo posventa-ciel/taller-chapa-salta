@@ -1320,11 +1320,25 @@ with tab_fac:
         panos_si_prop = df_si_prop[col_panos].apply(lambda x: pd.to_numeric(x, errors='coerce')).sum() if col_panos in df_si_prop else 0
         panos_est_prop = panos_fac_prop + panos_si_prop
 
-        # --- 3. CÁLCULOS DE OBJETIVOS (SOLO CON PAÑOS PROPIOS) ---
+        # --- 3. CÁLCULOS DE OBJETIVOS Y AVANCE DIARIO (SOLO CON PAÑOS PROPIOS) ---
         porcentaje_logro = min((panos_est_prop / OBJETIVO_MENSUAL_PANOS) * 100 if OBJETIVO_MENSUAL_PANOS > 0 else 0, 100)
+        
         dias_restantes = dias_restantes_calc
+        dias_totales_mes = DIAS_HABILES_MES
+        
+        # Días transcurridos exactos hasta la fecha actual
+        dias_transcurridos = dias_totales_mes - dias_restantes
+        
         panos_faltantes = max(0, OBJETIVO_MENSUAL_PANOS - panos_est_prop)
         ritmo_diario_necesario = panos_faltantes / dias_restantes if dias_restantes > 0 else 0
+        
+        # --- CÁLCULO DE AVANCE VS DÍAS TRANSCURRIDOS ---
+        ritmo_ideal_diario = OBJETIVO_MENSUAL_PANOS / dias_totales_mes if dias_totales_mes > 0 else 0
+        panos_esperados_a_hoy = ritmo_ideal_diario * dias_transcurridos
+        desvio_panos = panos_est_prop - panos_esperados_a_hoy
+        
+        color_desvio = "#28a745" if desvio_panos >= 0 else "#dc3545"
+        texto_desvio = f"🟢 Vas {abs(desvio_panos):.1f} paños ADELANTADO" if desvio_panos >= 0 else f"🔴 Vas {abs(desvio_panos):.1f} paños ATRASADO"
 
         st.markdown("### 🎯 Control de Objetivo Mensual")
         c_obj1, c_obj2 = st.columns([3, 1])
@@ -1333,7 +1347,25 @@ with tab_fac:
             st.caption(f"**Progreso del Mes:** {panos_est_prop:.1f} paños propios de un objetivo de {OBJETIVO_MENSUAL_PANOS} paños.")
         with c_obj2:
             st.markdown(f"<h3 style='text-align: right; color: {'#28a745' if porcentaje_logro >= 95 else '#ffc107' if porcentaje_logro >= 75 else '#dc3545'}; margin-top: 0;'>{porcentaje_logro:.1f}%</h3>", unsafe_allow_html=True)
-        st.info(f"⏱️ **Termómetro de Ritmo:** Faltan **{panos_faltantes:.1f} paños propios** y quedan **{dias_restantes} días hábiles**. Para llegar a la meta, el taller interno debe sacar **{ritmo_diario_necesario:.1f} paños por día**.")
+            
+        st.info(f"⏱️ **Proyección para llegar:** Faltan **{panos_faltantes:.1f} paños** y quedan **{dias_restantes} días hábiles**.\n"
+                f"► El taller interno debe sacar **{ritmo_diario_necesario:.1f} paños/día**.")
+                
+        # Tarjeta visual inyectada con el balance diario
+        st.markdown(f"""
+        <div style="background-color: #f8f9fa; border-left: 5px solid {color_desvio}; padding: 15px; border-radius: 5px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
+            <div style="display: flex; justify-content: space-between; align-items: center;">
+                <div>
+                    <h4 style="margin:0; color:#00235d;">📊 Avance vs. Días Transcurridos</h4>
+                    <p style="margin:0; font-size:0.95rem; color:#666;">Días hábiles transcurridos: <strong>{dias_transcurridos} de {dias_totales_mes}</strong></p>
+                </div>
+                <div style="text-align: right;">
+                    <h5 style="margin:0; color:#666; font-size: 0.9rem;">Objetivo ideal a hoy: {panos_esperados_a_hoy:.1f} paños</h5>
+                    <h4 style="margin:5px 0 0 0; color:{color_desvio}; font-weight: bold;">{texto_desvio}</h4>
+                </div>
+            </div>
+        </div>
+        """, unsafe_allow_html=True)
 
         st.write("### 💰 Rendimiento y Proyección al Cierre (Producción Interna)")
         c_r1, c_r2, c_r3 = st.columns(3)
