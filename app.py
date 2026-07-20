@@ -188,9 +188,22 @@ formato_panos = lambda x: f"{x:.1f}"
 # --- LÓGICA DE DÍAS HÁBILES ---
 anio_actual = datetime.now().year
 FERIADOS_ARG = [
-    date(anio_actual, 3, 24),
-    date(anio_actual, 4, 2), 
-    date(anio_actual, 4, 3)  
+    date(anio_actual, 1, 1),   # Año Nuevo
+    date(anio_actual, 2, 16),  # Carnaval
+    date(anio_actual, 2, 17),  # Carnaval
+    date(anio_actual, 3, 24),  # Día de la Memoria
+    date(anio_actual, 4, 2),   # Día de Malvinas / Jueves Santo
+    date(anio_actual, 4, 3),   # Viernes Santo
+    date(anio_actual, 5, 1),   # Día del Trabajador
+    date(anio_actual, 5, 25),  # Revolución de Mayo
+    date(anio_actual, 6, 17),  # Güemes
+    date(anio_actual, 6, 20),  # Belgrano
+    date(anio_actual, 7, 9),   # Día de la Independencia
+    date(anio_actual, 8, 17),  # San Martín
+    date(anio_actual, 10, 12), # Diversidad Cultural
+    date(anio_actual, 11, 20), # Soberanía Nacional
+    date(anio_actual, 12, 8),  # Inmaculada Concepción
+    date(anio_actual, 12, 25)  # Navidad
 ]
 
 def dias_habiles_del_mes(anio, mes):
