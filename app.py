@@ -1337,8 +1337,22 @@ with tab_fac:
         panos_esperados_a_hoy = ritmo_ideal_diario * dias_transcurridos
         desvio_panos = panos_est_prop - panos_esperados_a_hoy
         
-        color_desvio = "#28a745" if desvio_panos >= 0 else "#dc3545"
-        texto_desvio = f"🟢 Vas {abs(desvio_panos):.1f} paños ADELANTADO" if desvio_panos >= 0 else f"🔴 Vas {abs(desvio_panos):.1f} paños ATRASADO"
+        # --- Cálculos de porcentajes y semáforo ---
+        porcentaje_tiempo = (dias_transcurridos / dias_totales_mes) * 100 if dias_totales_mes > 0 else 0
+        porcentaje_avance_real = (panos_est_prop / panos_esperados_a_hoy) * 100 if panos_esperados_a_hoy > 0 else 0
+        
+        if porcentaje_avance_real >= 95:
+            color_desvio = "#28a745" # Verde
+            icono_desvio = "🟢"
+        elif porcentaje_avance_real >= 90:
+            color_desvio = "#d39e00" # Amarillo oscuro
+            icono_desvio = "🟡"
+        else:
+            color_desvio = "#dc3545" # Rojo
+            icono_desvio = "🔴"
+            
+        estado_txt = "ADELANTADO" if desvio_panos >= 0 else "ATRASADO"
+        texto_desvio = f"{icono_desvio} Vas {abs(desvio_panos):.1f} paños {estado_txt}"
 
         st.markdown("### 🎯 Control de Objetivo Mensual")
         c_obj1, c_obj2 = st.columns([3, 1])
@@ -1356,8 +1370,15 @@ with tab_fac:
         <div style="background-color: #f8f9fa; border-left: 5px solid {color_desvio}; padding: 15px; border-radius: 5px; margin-bottom: 25px; box-shadow: 0 1px 3px rgba(0,0,0,0.1);">
             <div style="display: flex; justify-content: space-between; align-items: center;">
                 <div>
-                    <h4 style="margin:0; color:#00235d;">📊 Avance vs. Días Transcurridos</h4>
-                    <p style="margin:0; font-size:0.95rem; color:#666;">Días hábiles transcurridos: <strong>{dias_transcurridos} de {dias_totales_mes}</strong></p>
+                    <h4 style="margin:0 0 8px 0; color:#00235d;">📊 Avance vs. Días Transcurridos</h4>
+                    <p style="margin:0 0 3px 0; font-size:0.95rem; color:#666;">
+                        ⏳ Tiempo transcurrido: <strong>{dias_transcurridos} de {dias_totales_mes} días</strong> 
+                        <span style="color: #00235d; font-weight: bold;">({porcentaje_tiempo:.1f}%)</span>
+                    </p>
+                    <p style="margin:0; font-size:0.95rem; color:#666;">
+                        🎯 Paños logrados vs esperados: <strong>{panos_est_prop:.1f} de {panos_esperados_a_hoy:.1f}</strong> 
+                        <span style="color: {color_desvio}; font-weight: bold;">({porcentaje_avance_real:.1f}%)</span>
+                    </p>
                 </div>
                 <div style="text-align: right;">
                     <h5 style="margin:0; color:#666; font-size: 0.9rem;">Objetivo ideal a hoy: {panos_esperados_a_hoy:.1f} paños</h5>
